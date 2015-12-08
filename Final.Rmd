@@ -1,0 +1,105 @@
+---
+title: "271 Final"
+author: "Glenn (Ted) Dunmire"
+date: "December 7, 2015"
+output: html_document
+---
+
+```{r}
+setwd("~/Documents/271 Final")
+library(ggplot2)
+library(reshape2)
+library(grid)
+library(astsa)
+library(forecast)
+```
+
+##Question 1
+
+_Analyze each of these variables (as well as a combination of them) very carefully and use them (or a subset of them) to build a model and test hypotheses to address the questions. Also address potential (statistical) issues that may be casued by omitted variables._
+_The philanthropist group hires a think tank to examine the relationship between the house values and neighborhood characteristics. For instance, they are interested in the extent to which houses in neighbhorhood with desirable features command higher values. They are specifically interested in environmental features, such as proximity to water body (i.e. lake, river, or ocean) or air quality._
+
+```{r}
+data <- read.csv("houseValueData.csv")
+data$withWater <- as.factor(data$withWater) #changed to factor based on documentation
+```
+
+Let us first begin with some basic examination of the data to see what kinds of variables we have and what their distributions look like. We have turned the withWater variable into a factor based on the documentation, because it is a categorical variable rather than an int. 
+
+```{r}
+str(data)
+sum(is.na(data))
+summary(data)
+```
+
+Notice we have 400 observations of 11 variables, with no missing values. 
+
+```{r}
+ggplot(melt(data[,-3]), aes(value)) + geom_histogram(color = "black", fill = "white") + facet_wrap(~variable, scales = "free") + labs(title = "Histogram of Variables")
+
+table(data$withWater)
+```
+
+```{r}
+#Scatterplots of variables against log of home Value
+data2 <- data
+data2$logHomeValue <- log(data2$homeValue) #Log transform homeValue
+
+plot_scatterplot = function(pl) {
+  return(pl + geom_point(size=1.5) + 
+           geom_smooth(method="lm", alpha=0.2) +
+           theme(legend.key.size=unit(.3, "cm")))
+}
+
+crimePC.value.plot <- ggplot(data2, aes(crimeRate_pc, logHomeValue))
+crimePC.value.plot = plot_scatterplot(crimePC.value.plot)
+
+nonRetail.value.plot <- ggplot(data2, aes(nonRetailBusiness, logHomeValue))
+nonRetail.value.plot = plot_scatterplot(nonRetail.value.plot)
+
+ageHouse.value.plot <- ggplot(data2, aes(ageHouse, logHomeValue))
+ageHouse.value.plot = plot_scatterplot(ageHouse.value.plot)
+
+distanceCity.value.plot <- ggplot(data2, aes(distanceToCity, logHomeValue))
+distanceCity.value.plot = plot_scatterplot(distanceCity.value.plot)
+
+distanceHighway.value.plot <- ggplot(data2, aes(distanceToHighway, logHomeValue))
+distanceHighway.value.plot = plot_scatterplot(distanceHighway.value.plot)
+
+pupilTeacher.value.plot <- ggplot(data2, aes(pupilTeacherRatio, logHomeValue))
+pupilTeacher.value.plot = plot_scatterplot(pupilTeacher.value.plot)
+
+lowIncome.value.plot <- ggplot(data2, aes(pctLowIncome, logHomeValue))
+lowIncome.value.plot = plot_scatterplot(lowIncome.value.plot)
+
+pollution.value.plot <- ggplot(data2, aes(pollutionIndex, logHomeValue))
+pollution.value.plot = plot_scatterplot(pollution.value.plot)
+
+nBedrooms.value.plot <- ggplot(data2, aes(nBedRooms, logHomeValue))
+nBedrooms.value.plot = plot_scatterplot(nBedrooms.value.plot)
+```
+
+#reconsider to use homeValue?
+
+#Possible categorical factors in crimeRate_pc (x < 1), ageHouse (x > 95), distanceToCity, distanceToHighway
+
+
+##Question 2
+
+_Build a time-series model for the series in series02.txt and use it to perform a 24-step ahead forecast._
+
+```{r}
+series <- read.table("series02.txt")
+series <- series$V1
+
+#Visualize the data
+par(mfrow = c(2,2))
+plot.ts(series, col = "navy", xlab = "Time Period", ylab = "Values", main = "Time Series for Series 02")
+hist(series, main = "Histogram of Values of Series 02")
+acf(series, main = "ACF of Series 02")
+pacf(series, main = "PACF of Series 02")
+```
+
+Notice the general structure of the series. There seems to be a long run average, where the values are fluctuating around a central axis but with with a major series of spikes in the beginning singaling serious volatility. There does not seem to be seasonality or a trend. The ACF interestingly shows a sharp drop after the 0 lag, but slightly statistically significant lags throughout the series. The PACF also shows slight significance at several lags after the most significant at what looks like the 3rd lag. 
+
+#GARCH, volatility -> section 7.4
