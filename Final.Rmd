@@ -12,6 +12,9 @@ library(reshape2)
 library(grid)
 library(astsa)
 library(forecast)
+library(quantmod)
+library(fGarch)
+library(tseries)
 ```
 
 ##Question 1
@@ -102,4 +105,46 @@ pacf(series, main = "PACF of Series 02")
 
 Notice the general structure of the series. There seems to be a long run average, where the values are fluctuating around a central axis but with with a major series of spikes in the beginning singaling serious volatility. There does not seem to be seasonality or a trend. The ACF interestingly shows a sharp drop after the 0 lag, but slightly statistically significant lags throughout the series. The PACF also shows slight significance at several lags after the most significant at what looks like the 3rd lag. 
 
-#GARCH, volatility -> section 7.4
+We suspect there is non-constant variance present in this series, so we will plot a correlogram of the squared values of a mean adjusted version of this series (adjusted so the mean is zero). 
+
+```{r}
+par(mfrow = c(1,1))
+acf((series - mean(series))^2, main = "ACF of Squared Terms")
+```
+
+The square values that are plotted are equivalent to the variance. What the statistically significant values indicate is that there is serial correlation, meaning conditional heteroskedasticity. In plain English, this means that the variance is not constant throughout the series, rather the variance depends on what window of time we are looking at. This violates a core assumption of stationarity, meaning we will have to use a non-stationary model to fit this data. 
+
+```{r}
+garch1 <- garch(series, trace = F)
+resids <- garch1$residuals[-1] #first value is NA
+
+garch2 <- garchFit(~garch(1,1), data = series, trace = FALSE)
+#Which model to use?
+par(mfrow = c(2,1))
+acf(resids, main = "ACF of GARCH(1,1) Residuals")
+acf(resids^2, main = "ACF of GARCH(1,1) Residuals^2")
+Box.test(resids, type = "Ljung-Box")
+```
+
+#Question: Do we think that's good enough? Look into fitting GARCH better
+
+##Question 3
+
+_Build a time-series model for the series in series03.csv and use it to perform a 24-step ahead forecast_
+
+```{r}
+#load data and do preliminary visualization
+series <- read.csv("series03.csv")
+series <- series$X9.88
+
+par(mfrow = c(2,2))
+plot.ts(series, xlab = "Time Period", ylab = "Value", main = "Time Series Plot of Series 03", col = "navy")
+hist(series, main = "Histogram of Series 03")
+acf(series, main = "ACF of Series 03")
+pacf(series, main = "PACF of Series 03")
+```
+
+Notice from the time series plot that there is significant trend going on, long term upwards. The ACF shows significance through all past lags while the PACF is only siginficant for the first lag
+
+#Looks like the previous (week 11) homework
+
