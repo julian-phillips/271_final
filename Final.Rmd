@@ -144,7 +144,23 @@ acf(series, main = "ACF of Series 03")
 pacf(series, main = "PACF of Series 03")
 ```
 
-Notice from the time series plot that there is significant trend going on, long term upwards. The ACF shows significance through all past lags while the PACF is only siginficant for the first lag
+Notice from the time series plot that there is significant trend going on, long term upwards. The ACF shows significance through all past lags while the PACF is only siginficant for the first lag. 
 
-#Looks like the previous (week 11) homework
+```{r}
+#plot ACF and PACF of differenced series
+par(mfrow = c(2,2))
+acf(series, main = "ACF of Series 03")
+pacf(series, main = "PACF of Series 03")
+acf(diff(series), main = "ACF of 1st Difference Series 03")
+pacf(diff(series), main = "PACF of 1st Difference Series 03")
+```
+
+```{r}
+fit1 <- arima(series, order = c(2,2,2))
+plot.ts(fit1$residuals)
+hist(fit1$residuals)
+acf(fit1$residuals)
+pacf(fit1$residuals)
+```
+#Looks like the previous (week 11) homework, ARIMA of log?
 
