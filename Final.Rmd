@@ -151,27 +151,42 @@ Notice from the time series plot that there is significant trend going on, long 
 
 
 ```{r}
-series2 <- diff(log(series)) #I think this should be difference = 2
-plot.ts(series2)
-hist(series2)
-acf(series2)
-pacf(series2)
-
-#difference of log using ARIMA and then GARCh for residuals but not sure how to forecast
+#plot different time series to suggest differencing
+par(mfrow = c(3, 2))
+plot.ts(series, main = "Original Time Series")
+plot.ts(log(series), main = "Log of Time Series")
+plot.ts(diff(series), main = "First Difference of Time Series")
+plot.ts(diff(series, d = 2), main = "Second Difference of Time Series")
+plot.ts(diff(log(series)), main = "First Difference of Log Time Series")
+plot.ts(diff(log(series), d = 2), main = "Second Difference of Log Time Series")
 ```
 
-First we will take the difference of the log of the series. The point of doing a difference is to remove the trend of the series and make it stationary, allowing us to fit a model to it. The first difference of a random walk process is white noise and by definition is stationary, so that seems like a good starting point to investigate. The time series plot of the differenced series looks much more like white noise, although it seems very volatile. The ACF shows no statistically significant autocorrelations, although the partial autocorrelations do show significance, particularly at the 15th and 20th lags. 
+It is clear from the original time series plot that the series is not stationary. Before proceeding to build a model we must render the series as stationary. 
 
 ```{r}
-#Fit ARIMA model 
-#Function to fit arima model based on parameters, credit Jeffrey Yau
+par(mfrow = c(2,2))
+acf(diff(series), main = "ACF of First order Difference")
+pacf(diff(series), main = "PACF of First order Difference")
+acf(diff(series, d= 2), main = "ACF of Second order Difference")
+pacf(diff(series, d = 2), main = "PACF of Second order Difference")
+
+acf(diff(log(series)), main = "ACF of First Order Difference of Log")
+pacf(diff(log(series)), main = "PACF of First Order Difference of Log")
+acf(diff(log(series), d = 2), main = "ACF of Second Order Difference of Log")
+pacf(diff(log(series), d = 2), main = "PACF of Second Order Difference of Log")
+```
+
+From examining these plots, it seems as though the second order difference provides the best transformation into white noise. In both cases the ACF shows a sharp cut off (suggesting an MA term) while the PACF gradually declines. The first order difference shows a lot of volatility in the PACF, suggesting correlations that are not easily captured. 
+Between the second order difference and the second order difference of the log, the second order difference of the log seems to look more like white noise. There are fewer significant autocorrelations (which might be due to sampling) in the second order difference of the log and it decays more smoothly. Therefore, we will use the second order difference of the log to estimate the model. 
+
+```{r}
 get.best.arima <- function(x.ts, maxord = c(1,1,1))
 {
   best.aic <- 1e8
   n <- length(x.ts)
   for (p in 0:maxord[1]) for (d in 0:maxord[2]) for (q in 0:maxord[3])
   {
-    fit <- arima(x.ts, order = c(p, d, q))
+    fit <- arima(x.ts, order = c(p, d, q), method = "ML")
     fit.aic <- -2 * fit$loglik + (log(n) + 1) * length(fit$coef)
     if (fit.aic < best.aic)
     {
@@ -183,19 +198,15 @@ get.best.arima <- function(x.ts, maxord = c(1,1,1))
   list(best.aic, best.fit, best.model)
 }
 
-arima.model <- get.best.arima(series, maxord = rep(2, 3))
-arima.model2 <- auto.arima(log(series), allowdrift = FALSE)
-arima.model
-arima.model2
+model <- arima(log(series), order = c(0, 2, 1))
+model
+t(confint(model))
 ```
 
-Both the method provided by Jeff and the auto arima function suggest using a 1st difference ARIMA model with no AR or MA terms to model the log of the series. 
+0 is not contained in the confidence interval so this coefficient is statistically significant. 
 
-#No parameters?
 
 ```{r}
-model <- arima(log(series), order = c(0, 1, 0))
-
 #diagnostic plots of residuals
 resids <- model$residuals
 plot.ts(resids, main = "Residuals of ARIMA Model")
@@ -204,8 +215,27 @@ acf(resids, main = "ACF of Residuals")
 pacf(resids, main = "PACF of Residuals")
 ```
 
+These residual diagnostics suggest a reasonably good aprpoximation of white noise. The ACF and PACF however do show quite a bit of volatility, so we will examine the squared residuals because we suspect there is non-constant variance. 
+
+```{r}
+par(mfrow = c(2,1))
+acf(resids, main = "ACF of Residuals")
+acf(resids^2, main = "ACF of Squared Residuals")
+```
+
+As we had suspected, the squared residuals show statistically significant terms at different intervals. Clearly, this suggests there is non-constant variance. Therefore, we will fit a GARCH model to the residuals. 
+
+```{r}
+resid.garch = garch(resids, trace = FALSE)
+t(confint(resid.garch))
+acf(resid.garch$residuals[-1], main = "ACF of GARCH fitted Residuals")
+acf(resid.garch$residuals[-1]^2, main = "ACF of GARCH fitted Residuals^2")
+```
 
 
+The GARCH model shows statistically significant coefficients at the 95% level, because 0 is not contained in the confidence intervals. The ACFs of both the GARCH residuals and residuals squared show no significant values, meaning a good fit to the residuals. 
+
+#Forecast? 
 ```{r}
 get.best.arima.seas <- function(x.ts, maxord = c(1,1,1,1,1,1)) {
   best.aic <- 1e8
