@@ -93,7 +93,7 @@ _Build a time-series model for the series in series02.txt and use it to perform 
 
 ```{r}
 series <- read.table("series02.txt")
-series <- series$V1
+series <- ts(series$V1)
 
 #Visualize the data
 par(mfrow = c(2,2))
@@ -103,7 +103,7 @@ acf(series, main = "ACF of Series 02")
 pacf(series, main = "PACF of Series 02")
 ```
 
-Notice the general structure of the series. There seems to be a long run average, where the values are fluctuating around a central axis but with with a major series of spikes in the beginning singaling serious volatility. There does not seem to be seasonality or a trend. The ACF interestingly shows a sharp drop after the 0 lag, but slightly statistically significant lags throughout the series. The PACF also shows slight significance at several lags after the most significant at what looks like the 3rd lag. 
+Notice the general structure of the series. There seems to be a long run average, where the values are fluctuating around a central axis but with with a major series of spikes in the beginning signaling serious volatility. There does not seem to be seasonality or a trend. The ACF interestingly shows a sharp drop after the 0 lag, but slightly statistically significant lags throughout the series. The PACF also shows slight significance at several lags after the most significant at what looks like the 3rd lag. 
 
 We suspect there is non-constant variance present in this series, so we will plot a correlogram of the squared values of a mean adjusted version of this series (adjusted so the mean is zero). 
 
@@ -118,15 +118,18 @@ The square values that are plotted are equivalent to the variance. What the stat
 garch1 <- garch(series, trace = F)
 resids <- garch1$residuals[-1] #first value is NA
 
-garch2 <- garchFit(~garch(1,1), data = series, trace = FALSE)
-#Which model to use?
 par(mfrow = c(2,1))
 acf(resids, main = "ACF of GARCH(1,1) Residuals")
 acf(resids^2, main = "ACF of GARCH(1,1) Residuals^2")
 Box.test(resids, type = "Ljung-Box")
+garch1
+t(confint(garch1))
 ```
 
+Notice that with the ACF of both the series residuals and sqaured residuals there is no autocorrelation. This suggests the residuals are behaving like white noise and thus the model is a good fit. Examining the model itself 0 is not contained in the 95% confidence intervals for the coefficients, meaning that the coefficients are satatistically significant at the 95% level. 
+
 #Question: Do we think that's good enough? Look into fitting GARCH better
+#Forecasting
 
 ##Question 3
 
@@ -135,7 +138,7 @@ _Build a time-series model for the series in series03.csv and use it to perform 
 ```{r}
 #load data and do preliminary visualization
 series <- read.csv("series03.csv")
-series <- series$X9.88
+series <- ts(series$X9.88)
 
 par(mfrow = c(2,2))
 plot.ts(series, xlab = "Time Period", ylab = "Value", main = "Time Series Plot of Series 03", col = "navy")
@@ -144,23 +147,111 @@ acf(series, main = "ACF of Series 03")
 pacf(series, main = "PACF of Series 03")
 ```
 
-Notice from the time series plot that there is significant trend going on, long term upwards. The ACF shows significance through all past lags while the PACF is only siginficant for the first lag. 
+Notice from the time series plot that there is significant trend going on, long term upwards. The ACF shows significance through all past lags while the PACF is only siginficant for the first lag. There does not seem to be any seasonality. This looks like the realization of a random walk with drift process. 
+
 
 ```{r}
-#plot ACF and PACF of differenced series
-par(mfrow = c(2,2))
-acf(series, main = "ACF of Series 03")
-pacf(series, main = "PACF of Series 03")
-acf(diff(series), main = "ACF of 1st Difference Series 03")
-pacf(diff(series), main = "PACF of 1st Difference Series 03")
+series2 <- diff(log(series)) #I think this should be difference = 2
+plot.ts(series2)
+hist(series2)
+acf(series2)
+pacf(series2)
+
+#difference of log using ARIMA and then GARCh for residuals but not sure how to forecast
 ```
 
+First we will take the difference of the log of the series. The point of doing a difference is to remove the trend of the series and make it stationary, allowing us to fit a model to it. The first difference of a random walk process is white noise and by definition is stationary, so that seems like a good starting point to investigate. The time series plot of the differenced series looks much more like white noise, although it seems very volatile. The ACF shows no statistically significant autocorrelations, although the partial autocorrelations do show significance, particularly at the 15th and 20th lags. 
+
 ```{r}
-fit1 <- arima(series, order = c(2,2,2))
-plot.ts(fit1$residuals)
-hist(fit1$residuals)
-acf(fit1$residuals)
-pacf(fit1$residuals)
+#Fit ARIMA model 
+#Function to fit arima model based on parameters, credit Jeffrey Yau
+get.best.arima <- function(x.ts, maxord = c(1,1,1))
+{
+  best.aic <- 1e8
+  n <- length(x.ts)
+  for (p in 0:maxord[1]) for (d in 0:maxord[2]) for (q in 0:maxord[3])
+  {
+    fit <- arima(x.ts, order = c(p, d, q))
+    fit.aic <- -2 * fit$loglik + (log(n) + 1) * length(fit$coef)
+    if (fit.aic < best.aic)
+    {
+      best.aic <- fit.aic
+      best.fit <- fit
+      best.model <- c(p, d, q)
+    }
+  }
+  list(best.aic, best.fit, best.model)
+}
+
+arima.model <- get.best.arima(series, maxord = rep(2, 3))
+arima.model2 <- auto.arima(log(series), allowdrift = FALSE)
+arima.model
+arima.model2
 ```
+
+Both the method provided by Jeff and the auto arima function suggest using a 1st difference ARIMA model with no AR or MA terms to model the log of the series. 
+
+#No parameters?
+
+```{r}
+model <- arima(log(series), order = c(0, 1, 0))
+
+#diagnostic plots of residuals
+resids <- model$residuals
+plot.ts(resids, main = "Residuals of ARIMA Model")
+hist(resids, main = "Histogram of Residuals")
+acf(resids, main = "ACF of Residuals")
+pacf(resids, main = "PACF of Residuals")
+```
+
+
+
+```{r}
+get.best.arima.seas <- function(x.ts, maxord = c(1,1,1,1,1,1)) {
+  best.aic <- 1e8
+  n <- length(x.ts)
+  for (p in 0:maxord[1]) for(d in 0:maxord[2]) for(q in 0:maxord[3])
+    for (P in 0:maxord[4]) for(D in 0:maxord[5]) for(Q in maxord[6])
+    {
+      fit <- arima(x.ts, order = c(p, d, q), seas = list(order = c(P,D,Q), frequency(x.ts)), method = "CSS")
+      fit.aic <- -2 * fit$loglik + (log(n) + 1) * length(fit$coef)
+      if (fit.aic < best.aic)
+      {
+        best.aic <- fit.aic
+        best.fit <- fit
+        best.model <- c(p, d, q, P, D, Q)
+      }
+    }
+  list(best.aic, best.fit, best.model)
+}
+
+```
+
+Step 1:  Do a time series plot of the data.  Examine it for features such as trend and seasonality.  You’ll know that you’ve gathered seasonal data (months, quarters, etc,) so look at the pattern across those time units (months, etc.) to see if there is indeed a seasonal pattern.
+
+Step 2:  Do any necessary differencing. The general guidelines are:
+
+If there is seasonality and no trend take a difference of lag S. For instance, take a 12th difference for monthly data with seasonality.
+If there is linear trend and no obvious seasonality, take a first difference.  If there is a curved trend, consider a transformation of the data before differencing.
+If there is both trend and seasonality, apply both a non-seasonal and seasonal difference to the data, as two successive operations (in either order).  For instance, if the series is called x, a successive first and 12th difference in R would be:
+diff1 = diff(x, 1)
+diff1and12=diff(diff1, 12)
+
+If there is neither obvious trend nor seasonality, don’t take any differences.
+Step 3:  Examine the ACF and PACF of the differenced data (if differencing is necessary).
+
+We’re using this information to determine possible models.  This can be tricky going involving some (educated) guessing.  Some basic guidance:
+
+Non-seasonal terms:  Examine the early lags (1, 2, 3, …) to judge non-seasonal terms.  Spikes in the ACF (at low lags) indicate non-seasonal MA terms.  Spikes in the PACF (at low lags) indicated possible non-seasonal AR terms.
+
+Seasonal terms:  Examine the patterns across lags that are multiples of S. For example, for monthly data, look at lags 12, 24, 36, and so on (probably won’t need to look at much more than the first two or three seasonal multiples).  Judge the ACF and PACF at the seasonal lags in the same way you do for the earlier lags.
+
+Step 4:  Estimate the model(s) that might be reasonable on the basis of Step 3.  Don’t forget to include any differencing that you did before looking at the ACF and PACF.  In the software, specify the original series as the data and then indicate the desired differencing when specifying parameters in the arima command that you’re using.
+
+Step 5:  Examine the residuals (with ACF, Box-Pierce, and any other means) to see if the model seems good.  Compare AIC or BIC values if you tried several models.
+
+If things don’t look good here, it’s back to Step 3 (or maybe even Step 2).
+
 #Looks like the previous (week 11) homework, ARIMA of log?
+
 
