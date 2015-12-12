@@ -1,0 +1,24 @@
+Step 1:  Do a time series plot of the data.  Examine it for features such as trend and seasonality.  You’ll know that you’ve gathered seasonal data (months, quarters, etc,) so look at the pattern across those time units (months, etc.) to see if there is indeed a seasonal pattern.
+
+Step 2:  Do any necessary differencing. The general guidelines are:
+
+If there is seasonality and no trend take a difference of lag S. For instance, take a 12th difference for monthly data with seasonality.
+If there is linear trend and no obvious seasonality, take a first difference.  If there is a curved trend, consider a transformation of the data before differencing.
+If there is both trend and seasonality, apply both a non-seasonal and seasonal difference to the data, as two successive operations (in either order).  For instance, if the series is called x, a successive first and 12th difference in R would be:
+diff1 = diff(x, 1)
+diff1and12=diff(diff1, 12)
+
+If there is neither obvious trend nor seasonality, don’t take any differences.
+Step 3:  Examine the ACF and PACF of the differenced data (if differencing is necessary).
+
+We’re using this information to determine possible models.  This can be tricky going involving some (educated) guessing.  Some basic guidance:
+
+Non-seasonal terms:  Examine the early lags (1, 2, 3, …) to judge non-seasonal terms.  Spikes in the ACF (at low lags) indicate non-seasonal MA terms.  Spikes in the PACF (at low lags) indicated possible non-seasonal AR terms.
+
+Seasonal terms:  Examine the patterns across lags that are multiples of S. For example, for monthly data, look at lags 12, 24, 36, and so on (probably won’t need to look at much more than the first two or three seasonal multiples).  Judge the ACF and PACF at the seasonal lags in the same way you do for the earlier lags.
+
+Step 4:  Estimate the model(s) that might be reasonable on the basis of Step 3.  Don’t forget to include any differencing that you did before looking at the ACF and PACF.  In the software, specify the original series as the data and then indicate the desired differencing when specifying parameters in the arima command that you’re using.
+
+Step 5:  Examine the residuals (with ACF, Box-Pierce, and any other means) to see if the model seems good.  Compare AIC or BIC values if you tried several models.
+
+If things don’t look good here, it’s back to Step 3 (or maybe even Step 2).

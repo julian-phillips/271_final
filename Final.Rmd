@@ -198,6 +198,15 @@ get.best.arima <- function(x.ts, maxord = c(1,1,1))
   list(best.aic, best.fit, best.model)
 }
 
+auto.arima(log(series), allowdrift = FALSE)
+mod <- auto.arima(log(series), d = 2)
+mod
+t(confint(mod))
+```
+
+Here we try using the auto.arima() function to find the best best. When using the auto.arima() function it suggests the first order difference of the log series. However, we saw above that this was not the best model examining the ACF and PACF so we instead specificed the order of differencing to be 2. When doing this, the suggested model is an ARIMA(2, 2, 1) model. However, examining the confidence intervals, we find that the 2 AR terms contain 0 in their confidence interval. That means we will fail to reject the null hypothesis these coefficients are 0. The MA term however does not contain 0 in its confidence interval and therefore we can reject the null hypothesis. Therefore, we will construct an ARIMA(0, 2, 1) model. 
+
+```{r}
 model <- arima(log(series), order = c(0, 2, 1))
 model
 t(confint(model))
@@ -257,31 +266,47 @@ get.best.arima.seas <- function(x.ts, maxord = c(1,1,1,1,1,1)) {
 
 ```
 
-Step 1:  Do a time series plot of the data.  Examine it for features such as trend and seasonality.  You’ll know that you’ve gathered seasonal data (months, quarters, etc,) so look at the pattern across those time units (months, etc.) to see if there is indeed a seasonal pattern.
 
-Step 2:  Do any necessary differencing. The general guidelines are:
 
-If there is seasonality and no trend take a difference of lag S. For instance, take a 12th difference for monthly data with seasonality.
-If there is linear trend and no obvious seasonality, take a first difference.  If there is a curved trend, consider a transformation of the data before differencing.
-If there is both trend and seasonality, apply both a non-seasonal and seasonal difference to the data, as two successive operations (in either order).  For instance, if the series is called x, a successive first and 12th difference in R would be:
-diff1 = diff(x, 1)
-diff1and12=diff(diff1, 12)
+##Question 4
 
-If there is neither obvious trend nor seasonality, don’t take any differences.
-Step 3:  Examine the ACF and PACF of the differenced data (if differencing is necessary).
+_Build a time-series model for the series in series04.csv and use it to perform a 24-step ahead forecast. Possible models include AR, MA, ARMA, ARIMA, Seasonal ARIMA, GARCH, ARIMA-GARCH, or Seasonal ARIMA-GARCH models. Note that the original series may need to be transformed before it be modelled._
 
-We’re using this information to determine possible models.  This can be tricky going involving some (educated) guessing.  Some basic guidance:
+```{r}
+#import data and run basic visualizations
+series <- read.csv("series04.csv")
+series <- ts(series$X25182)
 
-Non-seasonal terms:  Examine the early lags (1, 2, 3, …) to judge non-seasonal terms.  Spikes in the ACF (at low lags) indicate non-seasonal MA terms.  Spikes in the PACF (at low lags) indicated possible non-seasonal AR terms.
+par(mfrow = c(2,2))
+plot.ts(series, xlab = "Time Period", ylab = "Values", main = "Time Series Plot of Series 04")
+hist(series, main = "Histogram of Series 04")
+acf(series, main = "ACF of Series 04")
+pacf(series, main = "PACF of Series 04")
+```
 
-Seasonal terms:  Examine the patterns across lags that are multiples of S. For example, for monthly data, look at lags 12, 24, 36, and so on (probably won’t need to look at much more than the first two or three seasonal multiples).  Judge the ACF and PACF at the seasonal lags in the same way you do for the earlier lags.
+From the time series plot it should be obvious that there is seasonality in this series, suggesting seasonal lag terms will be needed. The series shows a general upwards trend, and we would argue this series is definitely not stationary. The ACF show statistically significant lags persisting but at different heights, further suggesting non-stationarity and seasonality. 
 
-Step 4:  Estimate the model(s) that might be reasonable on the basis of Step 3.  Don’t forget to include any differencing that you did before looking at the ACF and PACF.  In the software, specify the original series as the data and then indicate the desired differencing when specifying parameters in the arima command that you’re using.
+```{r}
+par(mfrow = c(3,2))
+plot.ts(series, xlab = "Time Period", ylab = "Values", main = "Time Series of Series 04 Original")
+plot.ts(log(series), xlab = "Time Period", ylab = "Values", main = "Log of Series 04")
+plot.ts(diff(series), xlab = "Time Period", ylab = "Values", main = "First Difference Series 04")
+plot.ts(diff(log(series)), xlab = "Time Period", ylab = "Values", main = "First Difference Log Series 04")
+plot.ts(diff(series, d = 2), xlab = "Time Period", ylab = "Values", main = "Second Difference Series 04")
+plot.ts(diff(log(series), d =2), xlab = "Time Period", ylab = "Values", main = "Second Difference Log Series 04")
+```
 
-Step 5:  Examine the residuals (with ACF, Box-Pierce, and any other means) to see if the model seems good.  Compare AIC or BIC values if you tried several models.
+We are going to take a look at taking the log transformation and differencing of the series. What we want is ideally for the series to look like a white noise series (white noise by definition is stationary). At a glance, it appears the First Difference of the log of the series is a good candidate, it does not show varying levels of volatility through the series instead remaining largely uniform. Notice for example the first difference of the regular series shows changing volatility moving from left to right, characterized by the series fluctuating up and down more. This would suggest non-constant variance and thus the series would not be considered stationary. 
 
-If things don’t look good here, it’s back to Step 3 (or maybe even Step 2).
+```{r}
+#Examine ACF and PACF of First difference
+par(mfrow = c(2,2))
+acf(diff(series), main = "ACF of First Difference Series")
+acf(diff(log(series)), main = "ACF of First Difference Log")
+pacf(diff(series), main = "PACF of First Difference")
+pacf(diff(log(series)), main = "PACF of First Difference Log")
+```
 
-#Looks like the previous (week 11) homework, ARIMA of log?
+Both the ACF and PACF of the first difference show highly significant lags at intervals of 6, suggesting a seasonal term is needed to capture this dynamic. This supports our earlier observation that there was seasonality present in this series. In particular the persistence of the lag in the ACF suggests a seasonal MA term at lag 6 would probably be appropriate. 
 
 
