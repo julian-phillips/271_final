@@ -6,7 +6,22 @@ output: html_document
 ---
 
 ```{r}
-setwd("~/Documents/271 Final")
+
+#Set Directory
+
+#Ted
+#setwd("~/Documents/271 Final")
+
+#Marlea
+setwd("C://Users/gwina003/Downloads/Final")
+
+#Julian
+#data <- read.csv("//vivica/Documents/MIDS/W271/271-Final/houseValueData.csv")
+
+
+install.packages("tseries")
+
+#Load Relevant Libraries
 library(ggplot2)
 library(car)
 library(reshape2)
@@ -18,6 +33,7 @@ library(fGarch)
 library(tseries)
 library(gridExtra)
 library(scales)
+library(plyr)
 library(GGally)
 ```
 
@@ -27,13 +43,8 @@ _Analyze each of these variables (as well as a combination of them) very careful
 _The philanthropist group hires a think tank to examine the relationship between the house values and neighborhood characteristics. For instance, they are interested in the extent to which houses in neighbhorhood with desirable features command higher values. They are specifically interested in environmental features, such as proximity to water body (i.e. lake, river, or ocean) or air quality._
 
 ```{r}
+#Read dataset
 data <- read.csv("houseValueData.csv")
-data$withWater <- as.factor(data$withWater) #changed to factor based on documentation
-```
-
-#used for julian only to set files elsewhere.  delete before knitting.
-```{r}
-data <- read.csv("//vivica/Documents/MIDS/W271/271-Final/houseValueData.csv")
 data$withWater <- as.factor(data$withWater) #changed to factor based on documentation
 ```
 
@@ -79,7 +90,6 @@ return(ContStatDF)
 ```
 
 
-
 The following function will be used to output a histogram and a scatterplot:
 
 ```{r}
@@ -102,10 +112,6 @@ return(output)
 
 ```
 
-
-
-
-
 Now let's take a closer look at each of the variables and its relationship with the variable of interest, homeValue.
 
 First, homeValue itself.  From the attached text file, homeValue is defined as _median price of single-family house in the neighborhood (measured in dollars)_.
@@ -116,8 +122,9 @@ ContStat(data$homeValue,0)
 ```
 
 
- The range of the variable is 112,500 through 1,125,000  There dont appear to be any values that are unreasonable for the homeValue variable.  The histogram shows a strong left skew of the variable with many of the values clustered together between the first and third quartile.  While this is the target variable of interest, I will also create a log (homeValue) price and use both of them to find the model that fits the best.
- 
+ The range of the variable is 112,500 through 1,125,000  There dont appear to be any values that are unreasonable for the homeValue variable.  The histogram shows a strong left skew of the variable with many of the values clustered together between the first and third quartile.  While this is the target variable of interest, I will also create a log (homeValue) price and use both of them to find the model with the best fit.
+
+##I thought when the tail was on the right, it is a right skew
  -----------------
 
 Next lets take a look at the crimeRatepc variable which is defined as _crime rate per capita, measured by number of crimes per 1000 residents in neighborhood_.
@@ -127,20 +134,20 @@ Graphs('crimeRate_pc', 'Crime Rate')
 ContStat(data$crimeRate_pc,2)
 ```
 
-Crime rate per capita shows a slight negative correlation against Home Value.  However, there is a extremely large number of neighborhoods that have a crime rate of close to zero which causes a very large left skew in the histogram.  Something that is eye catching in the scatterplot is that there appears to be a ceiling.  There are five points that all seem to have the same home value but with varying crime rates.  Lets take a closer look at those points.
+Crime rate per capita shows a slight negative correlation against Home Value.  However, there is a extremely large number of neighborhoods that have a crime rate of zero or close to zero.  The scatterplot shows that crime rate is more dispersed around areas of lower home value. That being said, there appears to be a small ceiling in the scatterplot- six points that all seem to have the same home value but with varying crime rates.  Lets take a closer look at those points.
 
 ```{r}
 subset(data, homeValue>1100000)
 ```
 
 
-Unexpectantly there is a maximum on the homeValue.  These values probably represent that median price being greater than 1125000 which means that the model will not be able to accurately predict points that great since these rows could have a true median homeValue of 1125000 or even ten or fifty times that value.  With the maximum identified, the bottom homeValue's should be examined to see if there is a minimum value.
+Unexpectedly there seems to be a maximum limit on the homeValue.  These values probably represent that median price being greater than 1125000 which means that the model will not be able to accurately predict points that great since these rows could have a true median homeValue of 1125000 or even ten or fifty times that value. Having identified this ceiling, we should check to see if there is a floor for the minimum home value. 
 
 ```{r}
 subset(data, homeValue<126000)
 ```
 
-With only one value at the minimum, there was no bucket in this data to collect all the minimum values, we only need to work about this maximum value.
+With only one value at the minimum, it seems unlikely that there is a minimum limit to the home value.
 
 A transformation for crime rate may be desired later, but all the other variables will be examined first.  Additionally, a decision on the steps to take with the maximum home value will be decided at the end of the variable examination.
 
@@ -160,7 +167,7 @@ freqs = count(data$nonRetailBusiness)
 freqs[with(freqs,order(-freq)),]
 ```
 
-There are 104 records here (over 25%!) with the same value of 0.1810 for the percentage of non retail business.  This is a various curious result.  Lets examine these records in detail. 
+There are 104 records here (over 25%!) with the same value of 0.1810 for the percentage of non retail business.  This is a curious result.  Lets examine these records in detail. 
 
 
 ```{r}
@@ -168,7 +175,7 @@ subset(data, nonRetailBusiness==.181)
 ```
 
 
-Not only do these records have the same value for Non Retail Business, but also for distance to highway and pupil teacher ratio.  This is a large problem when 25% of our records have the same value for 3 of 10 variables.  It is very likely that these three cannot be used for any model at the end.  However, those decisions will be made later.
+Not only do these records have the same value for Non Retail Business, but also for distance to highway and pupil teacher ratio.  This is a large problem when 25% of our records have the same value for 3 of 10 variables.  It is very likely that these three can be used for any model at the end.  However, those decisions will be made later.
 
 There was also a high number of records that had a value of 0.1958 for the non retail business variable.  Let's take a look at those as well. 
 
@@ -184,10 +191,9 @@ subset(data, nonRetailBusiness==.0814)
 
 The same issue with another 15 sharing the same values.  These 15 also have the same value for pollutionIndex.  Looking back, the 25 that had a nonRetailBusiness value of .1958 have only two different values.  The original 104 have different values, but I am now wary of a fourth variable.
 
-In fact, when nonRetailBusiness values of 0.0620, 0.2189, 0.0397, 0.0990, 0.1001 and 0.0856 are also looked at, they all have the same values for  pollutionindex, distance to highway and pupil teacher ratio.  While the records may be the problem, this is over half of the records and that is too many to be tossed.  Instead, these four variables will not be a part of the model.   
+In fact, when nonRetailBusiness values of 0.0620, 0.2189, 0.0397, 0.0990, 0.1001 and 0.0856 are also looked at, they all have the same values for  pollutionindex, distance to highway and pupil teacher ratio.  These variables will likely not contribute much together, as they tend to vary together as a group.
 
 ---------------
-
 
 The next variable is withwater which is defined as  _whether the neighborhood is within 5 miles of a water body (lake, river, etc); 1 if true and 0 otherwise_
 
@@ -197,18 +203,20 @@ table(data$withWater)
 ggplot(data, aes(withWater, homeValue)) + geom_boxplot() +  scale_y_continuous(name = "Home Value", labels = comma) + scale_x_discrete(name = "With Water: 1 = Yes, 0 = No")
 ```
 
-I do not see any reason to investigate this variable further.
+With water tends to have a slightly higher median home value than without water. Neighborhodds without water do tend to see some higher home values, but these are considered outliers that fall outside of the upper whisker.
 
 ----------------
 
-ageHouse is next which is defined as _proportion of house built before 1950_
+Now we will examine ageHouse, which is defined as _proportion of house built before 1950_
 
 ```{r}
 Graphs('ageHouse', 'Percentage of house built before 1950')
 ContStat(data$ageHouse,1)
 ```
 
-The range here is from 2.9 through 100.0 with a very large right skew indicating many of these neighborhoods were completely build before 1950.  With a solid ceiling of 100.0, there is ambiguity between neighborhoods built in 1950 and those in 1850.  Average age of the home would be a better variable here, but this is what we have.
+The range here is from 2.9 through 100.0 with a very large right skew indicating many of these neighborhoods were completely built before 1950.  With a solid ceiling of 100.0, there is ambiguity between neighborhoods built in 1950 and those in 1850. This might account for the larger variation in older neighborhoods home value. Even so, the newer home neighborhoods seem to have higher home values given that there is less of a spread than for older homes. Average age of the home would be a better variable in this case.
+
+#check skew definition
 
 ----------------
 
