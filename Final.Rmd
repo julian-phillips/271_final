@@ -1,6 +1,6 @@
 ---
 title: "271 Final"
-author: "Glenn (Ted) Dunmire"
+author: "Glenn (Ted) Dunmire, Marlea Gwinn, Julian Phillips"
 date: "December 7, 2015"
 output: html_document
 ---
@@ -56,7 +56,7 @@ sum(is.na(data))
 summary(data)
 ```
 
-Notice we have 400 observations of 11 variables, with no missing values. 
+Notice we have 400 observations of 11 variables, with no missing values. Here is a histogram with all variables in the same plot.
 
 ```{r}
 ggplot(melt(data[,-3]), aes(value)) + geom_histogram(color = "black", fill = "white") + facet_wrap(~variable, scales = "free") + labs(title = "Histogram of Variables")
@@ -255,7 +255,7 @@ Graphs('nBedRooms', 'Average Number of Bedrooms')
 ContStat(data$nBedRooms ,1)
 ```
 
-Finally! A normally distributed variable.  This one is also positively correlated as well.  This will likely be one of the most useful of the prediction variables.
+Finally! A normally distributed variable.  This one is also positively correlated as well.  This will likely be one of the most useful of the prediction variables. Its range of 1.6 to 6.8 matches with what we know about bedrooms in hours too.
 
 ----------------
 
@@ -265,6 +265,7 @@ So after examination of all the variables the following issues were identified t
 1. Create a transformation of the outcome variable, homeValue to make it more normal.  Use both to find best fitted model.
 2. There is a maximum value for homeValue which means any record with that value could have a true homeValue much greater.
 3. Almost no variables are normal and a transformation could be considered for crimerate, non retail business, ageHouse, distanceToCity, pctLowIncome
+
 
 
 From the original dataset, the following decisions were then made.
@@ -287,45 +288,6 @@ From the original dataset, the following decisions were then made.
 
 
 
-subset(data, nonRetailBusiness==.181)
-```{r}
-#Scatterplots of variables against log of home Value
-data2 <- data
-data2$logHomeValue <- log(data2$homeValue) #Log transform homeValue
-
-plot_scatterplot = function(pl) {
-  return(pl + geom_point(size=1.5) + 
-           geom_smooth(method="lm", alpha=0.2) +
-           theme(legend.key.size=unit(.3, "cm")))
-}
-
-crimePC.value.plot <- ggplot(data2, aes(crimeRate_pc, logHomeValue))
-crimePC.value.plot = plot_scatterplot(crimePC.value.plot)
-
-nonRetail.value.plot <- ggplot(data2, aes(nonRetailBusiness, logHomeValue))
-nonRetail.value.plot = plot_scatterplot(nonRetail.value.plot)
-
-ageHouse.value.plot <- ggplot(data2, aes(ageHouse, logHomeValue))
-ageHouse.value.plot = plot_scatterplot(ageHouse.value.plot)
-
-distanceCity.value.plot <- ggplot(data2, aes(distanceToCity, logHomeValue))
-distanceCity.value.plot = plot_scatterplot(distanceCity.value.plot)
-
-distanceHighway.value.plot <- ggplot(data2, aes(distanceToHighway, logHomeValue))
-distanceHighway.value.plot = plot_scatterplot(distanceHighway.value.plot)
-
-pupilTeacher.value.plot <- ggplot(data2, aes(pupilTeacherRatio, logHomeValue))
-pupilTeacher.value.plot = plot_scatterplot(pupilTeacher.value.plot)
-
-lowIncome.value.plot <- ggplot(data2, aes(pctLowIncome, logHomeValue))
-lowIncome.value.plot = plot_scatterplot(lowIncome.value.plot)
-
-pollution.value.plot <- ggplot(data2, aes(pollutionIndex, logHomeValue))
-pollution.value.plot = plot_scatterplot(pollution.value.plot)
-
-nBedrooms.value.plot <- ggplot(data2, aes(nBedRooms, logHomeValue))
-nBedrooms.value.plot = plot_scatterplot(nBedrooms.value.plot)
-```
 
 #reconsider to use homeValue?
 
@@ -371,7 +333,7 @@ garch1
 t(confint(garch1))
 ```
 
-Notice that with the ACF of both the series residuals and sqaured residuals there is no autocorrelation. This suggests the residuals are behaving like white noise and thus the model is a good fit. Examining the model itself 0 is not contained in the 95% confidence intervals for the coefficients, meaning that the coefficients are satatistically significant at the 95% level. 
+Notice that with the ACF of both the series residuals and squared residuals there is no autocorrelation. This suggests the residuals are behaving like white noise and thus the model is a good fit. Examining the model itself 0 is not contained in the 95% confidence intervals for the coefficients, meaning that the coefficients are satatistically significant at the 95% level. 
 
 #Question: Do we think that's good enough? Look into fitting GARCH better
 #Forecasting
@@ -383,7 +345,7 @@ _Build a time-series model for the series in series03.csv and use it to perform 
 ```{r}
 #load data and do preliminary visualization
 series <- read.csv("series03.csv")
-series <- ts(series$X9.88)
+series <- ts(series$V1)
 
 par(mfrow = c(2,2))
 plot.ts(series, xlab = "Time Period", ylab = "Value", main = "Time Series Plot of Series 03", col = "navy")
@@ -469,7 +431,7 @@ acf(resids, main = "ACF of Residuals")
 pacf(resids, main = "PACF of Residuals")
 ```
 
-These residual diagnostics suggest a reasonably good aprpoximation of white noise. The ACF and PACF however do show quite a bit of volatility, so we will examine the squared residuals because we suspect there is non-constant variance. 
+These residual diagnostics suggest a reasonably good approximation of white noise. The ACF and PACF however do show quite a bit of volatility, so we will examine the squared residuals because we suspect there is non-constant variance. 
 
 ```{r}
 par(mfrow = c(2,1))
