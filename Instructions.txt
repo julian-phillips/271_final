@@ -22,3 +22,16 @@ Step 4:  Estimate the model(s) that might be reasonable on the basis of Step 3. 
 Step 5:  Examine the residuals (with ACF, Box-Pierce, and any other means) to see if the model seems good.  Compare AIC or BIC values if you tried several models.
 
 If things don’t look good here, it’s back to Step 3 (or maybe even Step 2).
+
+garch.fit <- garch(resids, order = c(1,1))
+preds.garch <- predict(garch.fit, n.ahead = 24)
+g.fit <- garchFit(~garch(1,1),data = resids)
+
+na.omit(ts.diff2)
+g.fit2 <- garchFit(~arma(2,2) + garch(1,1), data = ts.diff2)
+preds <- predict(g.fit2, n.ahead = 24)
+
+plot(ts(preds$meanForecast), ylim =  c(-2, 2))
+lines(preds$meanForecast + sqrt(preds$standardDeviation), col = "blue")
+lines(preds$meanForecast - sqrt(preds$standardDeviation), col = "red")
+

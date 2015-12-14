@@ -10,10 +10,10 @@ output: html_document
 #Set Directory
 
 #Ted
-#setwd("~/Documents/271 Final")
+setwd("~/Documents/271 Final")
 
 #Marlea
-setwd("C://Users/gwina003/Downloads/Final")
+#setwd("C://Users/gwina003/Downloads/Final")
 
 #Julian
 #data <- read.csv("//vivica/Documents/MIDS/W271/271-Final/houseValueData.csv")
@@ -122,9 +122,9 @@ ContStat(data$homeValue,0)
 ```
 
 
- The range of the variable is 112,500 through 1,125,000  There dont appear to be any values that are unreasonable for the homeValue variable.  The histogram shows a strong left skew of the variable with many of the values clustered together between the first and third quartile.  While this is the target variable of interest, I will also create a log (homeValue) price and use both of them to find the model with the best fit.
+ The range of the variable is 112,500 through 1,125,000  There dont appear to be any values that are unreasonable for the homeValue variable.  The histogram shows a strong right skew of the variable with many of the values clustered together between the first and third quartile.  While this is the target variable of interest, I will also create a log (homeValue) price and use both of them to find the model with the best fit.
 
-##I thought when the tail was on the right, it is a right skew
+##I thought when the tail was on the right, it is a right skew - Yes it is, adjusted. 
  -----------------
 
 Next lets take a look at the crimeRatepc variable which is defined as _crime rate per capita, measured by number of crimes per 1000 residents in neighborhood_.
@@ -451,27 +451,7 @@ acf(resid.garch$residuals[-1]^2, main = "ACF of GARCH fitted Residuals^2")
 
 The GARCH model shows statistically significant coefficients at the 95% level, because 0 is not contained in the confidence intervals. The ACFs of both the GARCH residuals and residuals squared show no significant values, meaning a good fit to the residuals. 
 
-#Forecast? 
-```{r}
-get.best.arima.seas <- function(x.ts, maxord = c(1,1,1,1,1,1)) {
-  best.aic <- 1e8
-  n <- length(x.ts)
-  for (p in 0:maxord[1]) for(d in 0:maxord[2]) for(q in 0:maxord[3])
-    for (P in 0:maxord[4]) for(D in 0:maxord[5]) for(Q in maxord[6])
-    {
-      fit <- arima(x.ts, order = c(p, d, q), seas = list(order = c(P,D,Q), frequency(x.ts)), method = "CSS")
-      fit.aic <- -2 * fit$loglik + (log(n) + 1) * length(fit$coef)
-      if (fit.aic < best.aic)
-      {
-        best.aic <- fit.aic
-        best.fit <- fit
-        best.model <- c(p, d, q, P, D, Q)
-      }
-    }
-  list(best.aic, best.fit, best.model)
-}
-
-```
+#Forecast?
 
 
 
@@ -516,6 +496,44 @@ pacf(diff(log(series)), main = "PACF of First Difference Log")
 
 Both the ACF and PACF of the first difference show highly significant lags at intervals of 6, suggesting a seasonal term is needed to capture this dynamic. This supports our earlier observation that there was seasonality present in this series. In particular the persistence of the lag in the ACF suggests a seasonal MA term at lag 6 would probably be appropriate. 
 
+```{r}
+series2 <- diff(log(series), lag = 6)
+series3 <- diff(log(series), lag = 12)
+acf(series2, main = "ACF of First Difference with Seasonality 6")
+acf(series3, main = "ACF of First Difference with Seasonality 12")
+pacf(series2, main = "PACF of First Difference with Seasonality 6")
+pacf(series3, main = "PACF of First Difference with Seasonality 12")
+```
+
+Based on this it looks like there is seasonality at a period of 12 present in the data, which we would suggest probably comes from a monthly data set. 
+
+```{r}
+#function to find the best arima model. Credit to Cowpertwait and Metcalfe
+get.best.arima.seas <- function(x.ts, maxord = c(1,1,1,1,1,1)) {
+  best.aic <- 1e8
+  n <- length(x.ts)
+  for (p in 0:maxord[1]) for(d in 0:maxord[2]) for(q in 0:maxord[3])
+    for (P in 0:maxord[4]) for(D in 0:maxord[5]) for(Q in maxord[6])
+    {
+      fit <- arima(x.ts, order = c(p, d, q), seas = list(order = c(P,D,Q), frequency(x.ts)), method = "CSS")
+      fit.aic <- -2 * fit$loglik + (log(n) + 1) * length(fit$coef)
+      if (fit.aic < best.aic)
+      {
+        best.aic <- fit.aic
+        best.fit <- fit
+        best.model <- c(p, d, q, P, D, Q)
+      }
+    }
+  list(best.aic, best.fit, best.model)
+}
+
+get.best.arima.seas(log(series), maxord = rep(2, 6))
+auto.arima(log(series))
+
+#Which model?
+#possible use of frequency = 12
+(1,0,1)(0,1,1)[12] 
+```
 
 
 
