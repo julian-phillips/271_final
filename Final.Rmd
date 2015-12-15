@@ -16,7 +16,7 @@ setwd("~/Documents/271 Final")
 #setwd("C://Users/gwina003/Downloads/Final")
 
 #Julian
-#data <- read.csv("//vivica/Documents/MIDS/W271/271-Final/houseValueData.csv")
+data <- read.csv("//vivica/Documents/MIDS/W271/271-Final/houseValueData.csv")
 
 
 install.packages("tseries")
@@ -44,7 +44,7 @@ _The philanthropist group hires a think tank to examine the relationship between
 
 ```{r}
 #Read dataset
-data <- read.csv("houseValueData.csv")
+#data <- read.csv("houseValueData.csv")
 data$withWater <- as.factor(data$withWater) #changed to factor based on documentation
 ```
 
@@ -246,7 +246,18 @@ There is a very strong negative correlation on this scatterplot, unsurprisingly.
 
 ----------------
 
-The next variable is pollutionIndex, but it will not be examined.
+The next variable is pollutionIndex.  Even though it is highly correlated with non retail business, distance to highway and pupil teacher ratio, we will investigate it because the philanthropist group is interested.
+
+Pollutionindex is defied as _scaled between 0 and 100, with 0 being the best and 100 being the worst (i.e. uninhabitable)_
+
+```{r}
+Graphs('pollutionIndex', 'Pollution Index')
+ContStat(data$pollutionIndex ,1)
+```
+
+The bunching that is concerning is eveident in the scatterplot.  There does seem to be a negative correlation between pollution index and home value.  The histrogram shows a right skew, but the greatest value does have many records.
+
+----------------
 
 The final variable is nBedRooms which is _the average number of bed rooms in the single family houses in the neighborhood_
 
@@ -260,38 +271,99 @@ Finally! A normally distributed variable.  This one is also positively correlate
 ----------------
 
 
-So after examination of all the variables the following issues were identified that need to be dealt with and have not been.
-
-1. Create a transformation of the outcome variable, homeValue to make it more normal.  Use both to find best fitted model.
-2. There is a maximum value for homeValue which means any record with that value could have a true homeValue much greater.
-3. Almost no variables are normal and a transformation could be considered for crimerate, non retail business, ageHouse, distanceToCity, pctLowIncome
-
-
 
 From the original dataset, the following decisions were then made.
-1. Eliminate the variables non retail business, distance to highway, student pupil ratio and pollution index as they have too much colinearity with each other.
+
+1. Eliminate the variables non retail business, distance to highway and student pupil ratio  as they have too much colinearity with each other.  
+2. While pollutionindex is correlated with the three above, as the group specifically asked about it, it will be kept in the model for now.
+3. Create a transformation of home value, log home value, that will be used for fitting the model.  Whichever outcome variable performs the best will be used
+4. No other transformations will be used at this time.  If the model fit is poor, then transformations will be considered.
+5. For home value, there are 8 records that are categorical rather than continuous.  These are the values that likely mean 1125000 or greater.  Because we dont know their true value at all, they will be discarded.
+
+----------------
+
+Discard 8 records that are categorical.
+
+
+```{r}
+data = subset(data, homeValue!=1125000)
+```
+
+Create log home value
+```{r}
+data$loghomeValue = log(data$homeValue)
+```
+
+Examine the new variable:
+
+```{r}
+ggplot(data=data, aes(data$loghomeValue)) + geom_histogram()
+ContStat(data$loghomeValue ,1)
+```
+
+
+As expected, the transformation has made the histogram more normal, although there is a tail to the left.
+
+Now we will create two models using the variables identifed above.  One will have homevalue as the dependent variable while the other will have the log of home value.
+
+```{r}
+lm = lm(homeValue ~ crimeRate_pc+withWater+ageHouse+distanceToCity+pctLowIncome+pollutionIndex+nBedRooms, data=data)
+lmlog = lm(loghomeValue ~ crimeRate_pc+withWater+ageHouse+distanceToCity+pctLowIncome+pollutionIndex+nBedRooms, data=data)
+```
+
+
+Summarize both models:
+
+```{r}
+summary(lm)
+summary(lmlog)
+```
+
+In bothmodels, withwater and ageHouse are far less significant than the other 5 variables.  I will remove them and recreate the models.
+
+
+```{r}
+lm = lm(homeValue ~ (crimeRate_pc+distanceToCity+pctLowIncome+pollutionIndex+nBedRooms), data=data)
+lmlog = lm(loghomeValue ~ (crimeRate_pc+distanceToCity+pctLowIncome+pollutionIndex+nBedRooms), data=data)
+```
+
+
+Summarize both models:
+
+```{r}
+summary(lm)
+summary(lmlog)
+```
+
+The r squared values did not change which is unsurprising since the two variables removed were not adding a whole lot of new information to the model.  Lets take a look at histograms of the residuals. 
+
+```{r}
+lmresid = ggplot(data=lm, aes(lm$residuals)) + geom_histogram() +  ggtitle("Histogram of Home Value Model Residuals")
+lmlogresid =ggplot(data=lmlog, aes(lmlog$residuals)) + geom_histogram() +  ggtitle("Histogram of Log Home Value Model Residuals")
+  
+grid.arrange(lmresid, lmlogresid, ncol=2,nrow=1)
+
+```
+
+Both sets of residuals are fairly normal, although the log home value residuals are more normal.  That in addition to its higher r squared score makes it the favorite thus far.  However, lets take a look at the residual disagnostic plots for them before any final decision or addition or transformation of variables is undertaken.
+
+
+```{r}
+plot(lm)
+plot(lmlog)
+```
+
+Both models show evidence of heteroscedasticity in their residuals vs fitted plots.  The log home value model is worse in this sense than the normal one. Both Q-Q plots show that the residuals are pretty normally distributed.
+
+Both scale-location plots also indicate some heteroscedasticity.  Finally, the leverage plot indicates that while there are points with a large amount of leverage, they are within our bounds.
+
+At this point we need to either transform variables or add interaction terms.
 
 
 
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-#reconsider to use homeValue?
-
-#Possible categorical factors in crimeRate_pc (x < 1), ageHouse (x > 95), distanceToCity, distanceToHighway
 
 
 ##Question 2
