@@ -10,16 +10,13 @@ output: html_document
 #Set Directory
 
 #Ted
-setwd("~/Documents/271 Final")
+#setwd("~/Documents/271 Final")
 
 #Marlea
-#setwd("C://Users/gwina003/Downloads/Final")
+setwd("C://Users/gwina003/Downloads/Final")
 
 #Julian
-data <- read.csv("//vivica/Documents/MIDS/W271/271-Final/houseValueData.csv")
-
-
-install.packages("tseries")
+#data <- read.csv("//vivica/Documents/MIDS/W271/271-Final/houseValueData.csv")
 
 #Load Relevant Libraries
 library(ggplot2)
@@ -44,7 +41,7 @@ _The philanthropist group hires a think tank to examine the relationship between
 
 ```{r}
 #Read dataset
-#data <- read.csv("houseValueData.csv")
+data <- read.csv("houseValueData.csv")
 data$withWater <- as.factor(data$withWater) #changed to factor based on documentation
 ```
 
@@ -124,7 +121,6 @@ ContStat(data$homeValue,0)
 
  The range of the variable is 112,500 through 1,125,000  There dont appear to be any values that are unreasonable for the homeValue variable.  The histogram shows a strong right skew of the variable with many of the values clustered together between the first and third quartile.  While this is the target variable of interest, I will also create a log (homeValue) price and use both of them to find the model with the best fit.
 
-##I thought when the tail was on the right, it is a right skew - Yes it is, adjusted. 
  -----------------
 
 Next lets take a look at the crimeRatepc variable which is defined as _crime rate per capita, measured by number of crimes per 1000 residents in neighborhood_.
@@ -134,7 +130,7 @@ Graphs('crimeRate_pc', 'Crime Rate')
 ContStat(data$crimeRate_pc,2)
 ```
 
-Crime rate per capita shows a slight negative correlation against Home Value.  However, there is a extremely large number of neighborhoods that have a crime rate of zero or close to zero.  The scatterplot shows that crime rate is more dispersed around areas of lower home value. That being said, there appears to be a small ceiling in the scatterplot- six points that all seem to have the same home value but with varying crime rates.  Lets take a closer look at those points.
+Crime rate per capita shows a slight negative correlation against Home Value.  However, there is an extremely large number of neighborhoods that have a crime rate of zero or close to zero.  The scatterplot shows that crime rate is more dispersed around areas of lower home value. That being said, there appears to be a small ceiling in the scatterplot- six points that all seem to have the same home value but with varying crime rates.  Lets take a closer look at those points.
 
 ```{r}
 subset(data, homeValue>1100000)
@@ -175,7 +171,7 @@ subset(data, nonRetailBusiness==.181)
 ```
 
 
-Not only do these records have the same value for Non Retail Business, but also for distance to highway and pupil teacher ratio.  This is a large problem when 25% of our records have the same value for 3 of 10 variables.  It is very likely that these three can be used for any model at the end.  However, those decisions will be made later.
+Not only do these records have the same value for Non Retail Business, but also for distance to highway and pupil teacher ratio.  This could indicate a probelem because 25% of our records have the same value for 3 of 10 variables.  It is very likely that these three can be used together for any model.
 
 There was also a high number of records that had a value of 0.1958 for the non retail business variable.  Let's take a look at those as well. 
 
@@ -203,20 +199,18 @@ table(data$withWater)
 ggplot(data, aes(withWater, homeValue)) + geom_boxplot() +  scale_y_continuous(name = "Home Value", labels = comma) + scale_x_discrete(name = "With Water: 1 = Yes, 0 = No")
 ```
 
-With water tends to have a slightly higher median home value than without water. Neighborhodds without water do tend to see some higher home values, but these are considered outliers that fall outside of the upper whisker.
+With water tends to have a slightly higher median home value than without water. Neighborhoods without water do tend to see some higher home values, but these are considered outliers that fall outside of the upper whisker.
 
 ----------------
 
-Now we will examine ageHouse, which is defined as _proportion of house built before 1950_
+Now we will examine ageHouse, which is defined as _proportion of houses built before 1950_
 
 ```{r}
 Graphs('ageHouse', 'Percentage of house built before 1950')
 ContStat(data$ageHouse,1)
 ```
 
-The range here is from 2.9 through 100.0 with a very large right skew indicating many of these neighborhoods were completely built before 1950.  With a solid ceiling of 100.0, there is ambiguity between neighborhoods built in 1950 and those in 1850. This might account for the larger variation in older neighborhoods home value. Even so, the newer home neighborhoods seem to have higher home values given that there is less of a spread than for older homes. Average age of the home would be a better variable in this case.
-
-#check skew definition
+The range here is from 2.9 through 100.0 with a left skew indicating many of these neighborhoods have older homes (built before 1950). With such age buckets, there is ambiguity between neighborhoods built in 1950 and those in 1850. This might account for the larger variation in older neighborhoods home value. Even so, the newer home neighborhoods seem to have higher home values given that there is less of a spread than for older homes. Average age of the home would be a better variable in this case.
 
 ----------------
 
@@ -227,12 +221,13 @@ Graphs('distanceToCity', 'Miles to Nearest House')
 ContStat(data$distanceToCity ,1)
 ```
 
-Interestingly, the min value here is not 0 which indicates that none of these neighborhoods are in the city?  That does not seem to make sense, however, despite the heavy left skew in the histogram, there is nothing else notable about this variable. 
-
+Interestingly, the min value here is not 0 which indicates that none of these neighborhoods are actually in the city. The histogram tends to be right skewed, indicating that many neighborhoods are close to the city, while a few are over 40 miles from the city.
 
 -----------------
 
 The next two variables in the dataset are distanceToHighway and pupilTeacherRatio.  However, as discussed above these two variables will not be used in the model, so further investigation of them is unnecessary.
+
+#I think we should probably talk about these... I can write them up tomorrow 
 
 The next variable is another percent, pctLowIncome which is _percentage of low income household in the neighborhood_
 
@@ -241,21 +236,20 @@ Graphs('pctLowIncome', 'Percent of low income households in the neighborhood')
 ContStat(data$pctLowIncome ,1)
 ```
 
-There is a very strong negative correlation on this scatterplot, unsurprisingly.  If you have a low income its unlikely that you can afford a house with a high value.  This is also very left skewing in the histogram and a transformation is a possibility.
-
+There is a very strong negative correlation on this scatterplot, unsurprisingly.  If you have a low income its unlikely that you can afford a house with a high value.  This variable is also right skewed, as demonstrated by the histogram. 
 
 ----------------
 
 The next variable is pollutionIndex.  Even though it is highly correlated with non retail business, distance to highway and pupil teacher ratio, we will investigate it because the philanthropist group is interested.
 
-Pollutionindex is defied as _scaled between 0 and 100, with 0 being the best and 100 being the worst (i.e. uninhabitable)_
+Pollutionindex is defined as _scaled between 0 and 100, with 0 being the best and 100 being the worst (i.e. uninhabitable)_
 
 ```{r}
 Graphs('pollutionIndex', 'Pollution Index')
 ContStat(data$pollutionIndex ,1)
 ```
 
-The bunching that is concerning is eveident in the scatterplot.  There does seem to be a negative correlation between pollution index and home value.  The histrogram shows a right skew, but the greatest value does have many records.
+The scatterplot displays multiple segments: high home values and relativey low polution, medium home value and medium pollution, and low home value and high polution. There does seem to be a negative correlation between pollution index and home value, although the scatterplot shows a lot of variation. The histrogram shows a right skew.
 
 ----------------
 
@@ -266,10 +260,9 @@ Graphs('nBedRooms', 'Average Number of Bedrooms')
 ContStat(data$nBedRooms ,1)
 ```
 
-Finally! A normally distributed variable.  This one is also positively correlated as well.  This will likely be one of the most useful of the prediction variables. Its range of 1.6 to 6.8 matches with what we know about bedrooms in hours too.
+Finally! A normally distributed variable.  This one is also positively correlated with home value.  This will likely be one of the most useful of the prediction variables. It ranges from 1.6 to 6.4, which are reasonable average bedrooms for houses.
 
 ----------------
-
 
 
 From the original dataset, the following decisions were then made.
@@ -282,23 +275,32 @@ From the original dataset, the following decisions were then made.
 
 ----------------
 
-Discard 8 records that are categorical.
-
+First, we will subset the data and transform some of the variables:
 
 ```{r}
+#Subset data to remove categorical home values (ceiling)
 data = subset(data, homeValue!=1125000)
-```
 
-Create log home value
-```{r}
+#Transform Variables
 data$loghomeValue = log(data$homeValue)
-```
+data$crimeRate_zero[data$crimeRate_pc < 1.0] <- 1
+data$crimeRate_zero[data$crimeRate_pc >= 1.0] <- 0
+data$crimeRate_zero <-as.factor(data$crimeRate_zero)
+data$olderthan100[data$ageHouse >= 100.00] <- 1
+data$olderthan100[data$ageHouse < 100.00] <- 0
+data$olderthan100<- as.factor(data$olderthan100)
 
-Examine the new variable:
 
-```{r}
+#Examine Transformations
 ggplot(data=data, aes(data$loghomeValue)) + geom_histogram()
 ContStat(data$loghomeValue ,1)
+
+par(mfrow = c(2,2))
+hist(data$pctLowIncome)
+hist(sqrt(data$pctLowIncome))
+hist(data$crimeRate_pc[data$crimeRate_pc >= 1.0], breaks = 30)
+hist(sqrt(data$crimeRate_pc[data$crimeRate_pc >= 1.0]), breaks = 30)
+
 ```
 
 
@@ -307,30 +309,26 @@ As expected, the transformation has made the histogram more normal, although the
 Now we will create two models using the variables identifed above.  One will have homevalue as the dependent variable while the other will have the log of home value.
 
 ```{r}
-lm = lm(homeValue ~ crimeRate_pc+withWater+ageHouse+distanceToCity+pctLowIncome+pollutionIndex+nBedRooms, data=data)
-lmlog = lm(loghomeValue ~ crimeRate_pc+withWater+ageHouse+distanceToCity+pctLowIncome+pollutionIndex+nBedRooms, data=data)
-```
+#Create Models
 
+lm = lm(homeValue ~ crimeRate_pc+crimeRate_zero+olderthan100+withWater+ageHouse+distanceToCity+pctLowIncome+pollutionIndex+nBedRooms, data=data)
 
-Summarize both models:
+#removed agehouse, got to .77 R squared
+lmlog = lm(loghomeValue ~ sqrt(crimeRate_pc)+crimeRate_zero+olderthan100+withWater+distanceToCity+sqrt(pctLowIncome)+pollutionIndex+nBedRooms, data=data)
 
-```{r}
+#Summarize Models
 summary(lm)
 summary(lmlog)
 ```
 
-In bothmodels, withwater and ageHouse are far less significant than the other 5 variables.  I will remove them and recreate the models.
-
-
-```{r}
-lm = lm(homeValue ~ (crimeRate_pc+distanceToCity+pctLowIncome+pollutionIndex+nBedRooms), data=data)
-lmlog = lm(loghomeValue ~ (crimeRate_pc+distanceToCity+pctLowIncome+pollutionIndex+nBedRooms), data=data)
-```
-
-
-Summarize both models:
+In both models, withwater and ageHouse are far less significant than the other 5 variables.  I will remove them and recreate the models.
 
 ```{r}
+
+lm = lm(homeValue ~ crimeRate_pc+olderthan100+withWater+distanceToCity+pctLowIncome+pollutionIndex+nBedRooms, data=data)
+lmlog = lm(loghomeValue ~ crimeRate_pc+olderthan100+withWater+distanceToCity+sqrt(pctLowIncome)+pollutionIndex+nBedRooms, data=data)
+
+#Summarize Models
 summary(lm)
 summary(lmlog)
 ```
@@ -358,9 +356,6 @@ Both models show evidence of heteroscedasticity in their residuals vs fitted plo
 Both scale-location plots also indicate some heteroscedasticity.  Finally, the leverage plot indicates that while there are points with a large amount of leverage, they are within our bounds.
 
 At this point we need to either transform variables or add interaction terms.
-
-
-
 
 
 
