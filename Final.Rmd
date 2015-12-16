@@ -32,6 +32,8 @@ library(gridExtra)
 library(scales)
 library(plyr)
 library(GGally)
+library(sandwich)
+library(lmtest)
 ```
 
 ##Question 1
@@ -541,38 +543,18 @@ pacf(series, main = "PACF of Series 04")
 From the time series plot it should be obvious that there is seasonality in this series, suggesting seasonal lag terms will be needed. The series shows a general upwards trend, and we would argue this series is definitely not stationary. The ACF show statistically significant lags persisting but at different heights, further suggesting non-stationarity and seasonality. 
 
 ```{r}
-par(mfrow = c(3,2))
-plot.ts(series, xlab = "Time Period", ylab = "Values", main = "Time Series of Series 04 Original")
-plot.ts(log(series), xlab = "Time Period", ylab = "Values", main = "Log of Series 04")
-plot.ts(diff(series), xlab = "Time Period", ylab = "Values", main = "First Difference Series 04")
-plot.ts(diff(log(series)), xlab = "Time Period", ylab = "Values", main = "First Difference Log Series 04")
-plot.ts(diff(series, d = 2), xlab = "Time Period", ylab = "Values", main = "Second Difference Series 04")
-plot.ts(diff(log(series), d =2), xlab = "Time Period", ylab = "Values", main = "Second Difference Log Series 04")
+#Transform series to make stationary
+series <- read.csv("series04.csv")
+series <- ts(series$X25182, frequency = 12)
+
+plot.ts(diff(log(series)), main = "Time Series of Log First Difference")
+hist(diff(log(series)), main = "Histogram of Log First Difference")
+acf(diff(log(series)), main = "ACF of Log First Difference")
+pacf(diff(log(series)), main = "PACF of Log First Difference")
 ```
 
-We are going to take a look at taking the log transformation and differencing of the series. What we want is ideally for the series to look like a white noise series (white noise by definition is stationary). At a glance, it appears the First Difference of the log of the series is a good candidate, it does not show varying levels of volatility through the series instead remaining largely uniform. Notice for example the first difference of the regular series shows changing volatility moving from left to right, characterized by the series fluctuating up and down more. This would suggest non-constant variance and thus the series would not be considered stationary. 
-
-```{r}
-#Examine ACF and PACF of First difference
-par(mfrow = c(2,2))
-acf(diff(series), main = "ACF of First Difference Series")
-acf(diff(log(series)), main = "ACF of First Difference Log")
-pacf(diff(series), main = "PACF of First Difference")
-pacf(diff(log(series)), main = "PACF of First Difference Log")
-```
-
-Both the ACF and PACF of the first difference show highly significant lags at intervals of 6, suggesting a seasonal term is needed to capture this dynamic. This supports our earlier observation that there was seasonality present in this series. In particular the persistence of the lag in the ACF suggests a seasonal MA term at lag 6 would probably be appropriate. 
-
-```{r}
-series2 <- diff(log(series), lag = 6)
-series3 <- diff(log(series), lag = 12)
-acf(series2, main = "ACF of First Difference with Seasonality 6")
-acf(series3, main = "ACF of First Difference with Seasonality 12")
-pacf(series2, main = "PACF of First Difference with Seasonality 6")
-pacf(series3, main = "PACF of First Difference with Seasonality 12")
-```
-
-Based on this it looks like there is seasonality at a period of 12 present in the data, which we would suggest probably comes from a monthly data set. 
+We are reimporting the series and setting the frequency to 12. We suspect the seasonality occurs on a monthly basis and counted 24 trough to peak cycles, indicating a seasonal period of 12. As is generally good practice we will take the log of the series and take the first difference to render the series more stationary. 
+The time series plot of the differenced series resembles white noise. However, the ACF shows regular significance suggesting seasonal terms will be needed there. The PACF also shows seasonality although somewhat less as it decreases eventually. Both plots also show significance at the first lag suggesting non-seasonal terms will also be needed. 
 
 ```{r}
 #function to find the best arima model. Credit to Cowpertwait and Metcalfe
@@ -582,7 +564,7 @@ get.best.arima.seas <- function(x.ts, maxord = c(1,1,1,1,1,1)) {
   for (p in 0:maxord[1]) for(d in 0:maxord[2]) for(q in 0:maxord[3])
     for (P in 0:maxord[4]) for(D in 0:maxord[5]) for(Q in maxord[6])
     {
-      fit <- arima(x.ts, order = c(p, d, q), seas = list(order = c(P,D,Q), frequency(x.ts)), method = "CSS")
+      fit <- arima(x.ts, order = c(p, d, q), seas = list(order = c(P,D,Q), 12), method = "CSS")
       fit.aic <- -2 * fit$loglik + (log(n) + 1) * length(fit$coef)
       if (fit.aic < best.aic)
       {
@@ -594,19 +576,60 @@ get.best.arima.seas <- function(x.ts, maxord = c(1,1,1,1,1,1)) {
   list(best.aic, best.fit, best.model)
 }
 
-get.best.arima.seas(log(series), maxord = rep(2, 6))
-auto.arima(log(series))
+get.best.arima.seas(log(series), maxord = rep(3, 6))
+auto.arima(log(series), d = 1, D = 1) #note specified the use of seasonality
 
-#Which model?
-#possible use of frequency = 12
-(1,0,1)(0,1,1)[12] 
+#get.best -> (3, 0, 3) (2, 0, 3) [12]
+#auto -> (2, 1, 0) (2, 1, 2) [12]
+
+mod <- auto.arima(log(series), d = 1, D = 1)
+mod2 <- arima(log(series), order = c(3, 0, 3), seasonal = list(order = c(2, 0, 3), 12))
+mod
+mod2
 ```
 
+We utilized both the auto.arima() function and the get.best.arima.seas() function (from the time series textbook) to acquire suggested model fits. However, we know the model should include a first difference and a seasonal difference from our previous investigation. Otherwise the model will not be stationary, and we will be unable to fit a model to it. The auto.arima() model's AIC is slightly higher `r AIC(mod)` versus `r AIC(mod2)`, but we believe that the model suggested by auto arima will better satisfy our assumptions. Therefore, we will investigate this model going forward. 
+
+```{r}
+t(confint(mod))
+#comparison model is (2, 1, 0)(2, 1, 2)[12] with AIC -779.5714
+mod3 <- arima(log(series), order = c(3, 1, 0), seasonal = list(order = c(2, 1, 2), 12))
+mod4 <- arima(log(series), order = c(2, 1, 1), seasonal = list(order = c(2, 1, 2), 12))
+mod5 <- arima(log(series), order = c(2, 1, 0), seasonal = list(order = c(3, 1, 2), 12))
+mod6 <- arima(log(series), order = c(2, 1, 0), seasonal = list(order = c(2, 1, 3), 12))
+AIC(mod3)
+AIC(mod4)
+AIC(mod5)
+AIC(mod6)
+```
+
+Note that 0 is not contained in the confidence intervals of any of the terms for our model, which is currently ARIMA(2, 1, 0)(2, 1, 2)[12]. This means that we reject the null hypothesis and conclude that the evidence supports the alternative hypothesis that our model coefficients are different from 0. Further, above we have deliberately attempted to overfit our data by providing additional parameters. In all cases the AIC increases, suggesting that these models do not do a better job of explaining our data simply. In general, one wants a model that minimizes the AIC. 
+
+Therefore, we will continue with residual diagnostics for our chosen model
+
+```{r}
+par(mfrow = c(2,2))
+resids <- mod$residuals
+plot.ts(resids, main = "Time Series Plot of Residuals")
+hist(resids, main = "Time Series Plot of Residuals")
+acf(resids, main = "ACF Plot of Residuals")
+pacf(resids, main = "ACF Plot of Residuals")
+
+par(mfrow = c(2, 1))
+acf(resids, main = "ACF of Residuals")
+acf(resids^2, main = "ACF of Residuals^2")
+Box.test(resids, type = "Ljung-Box")
+
+```
+
+Overall, the residuals appear to largely resemble white noise. The time series plot looks fairly like white noise, with no obvious patterns suggesting seasonality or a trend. There is one large spike, which we would need to know more about this data to properly try to account for. This was noted in the time series plot of the original data. 
+The ACF shows one significant term at around 3/4 and the PACF shows two significant terms around the same area. However, there are no highly significant terms in the early part of the model (beyond the expected term of the ACF) and there is no repeating pattern of terms that are significant. Further, the residuals fail to reject the null hypothesis of the Ljung-Box test, meaning that the evidence suggests the observations are independent. 
+There are some terms that are significant in the residual squared ACF, but none are highly significant and as there are only three, this does not represent a large enough number to suggest our residuals are behaving other than white noise. 
+
+We will note here that the residuals do not perfectly resemble white noise. There are still several lags showing statistical significant, which is not what we would want to see. However, we believe that we have fit the best possible model with the available information that we have. We would like to know more about the data and sampling methods to be able to fit the most appropriate possible model. We do however believe that we have satistified the conditions of stationarity and residuals behaving as white noise sufficiently to be able to forecast. 
 
 
-
-
-
+#Check on Box test, is that what it says?
 
 
 #Appendix
