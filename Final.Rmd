@@ -5,6 +5,13 @@ date: "December 7, 2015"
 output: html_document
 ---
 
+##Question 1
+
+_Analyze each of these variables (as well as a combination of them) very carefully and use them (or a subset of them) to build a model and test hypotheses to address the questions. Also address potential (statistical) issues that may be casued by omitted variables._
+_The philanthropist group hires a think tank to examine the relationship between the house values and neighborhood characteristics. For instance, they are interested in the extent to which houses in neighbhorhood with desirable features command higher values. They are specifically interested in environmental features, such as proximity to water body (i.e. lake, river, or ocean) or air quality._
+
+
+###Preparation for data analysis
 ```{r}
 
 #Set Directory
@@ -13,7 +20,7 @@ output: html_document
 #setwd("~/Documents/271 Final")
 
 #Marlea
-setwd("C://Users/gwina003/Downloads/Final")
+#setwd("C://Users/gwina003/Downloads/Final")
 
 #Julian
 #data <- read.csv("//vivica/Documents/MIDS/W271/271-Final/houseValueData.csv")
@@ -36,34 +43,31 @@ library(sandwich)
 library(lmtest)
 ```
 
-##Question 1
-
-_Analyze each of these variables (as well as a combination of them) very carefully and use them (or a subset of them) to build a model and test hypotheses to address the questions. Also address potential (statistical) issues that may be casued by omitted variables._
-_The philanthropist group hires a think tank to examine the relationship between the house values and neighborhood characteristics. For instance, they are interested in the extent to which houses in neighbhorhood with desirable features command higher values. They are specifically interested in environmental features, such as proximity to water body (i.e. lake, river, or ocean) or air quality._
-
+###Read data and conduct initial variable examination
 ```{r}
 #Read dataset
 data <- read.csv("houseValueData.csv")
-data$withWater <- as.factor(data$withWater) #changed to factor based on documentation
-```
 
-Let us first begin with some basic examination of the data to see what kinds of variables we have and what their distributions look like. We have turned the withWater variable into a factor based on the documentation, because it is a categorical variable rather than an int. 
+#Changed with water to factor based on documentation; this is a categorical variable rather than an integer
+data$withWater <- as.factor(data$withWater) 
 
-```{r}
+#Initial variable examination
 str(data)
 sum(is.na(data))
 summary(data)
 ```
 
-Notice we have 400 observations of 11 variables, with no missing values. Here is a histogram with all variables in the same plot.
+The provided dataset contains 400 observations of 11 variables, with no missing values. Below is a view of the histograms of all numeric variables in the dataset.
 
 ```{r}
+#Histogram of variables 
 ggplot(melt(data[,-3]), aes(value)) + geom_histogram(color = "black", fill = "white") + facet_wrap(~variable, scales = "free") + labs(title = "Histogram of Variables")
 ```
 
-The following function will be used to get detailed summary statistics for each continuous variable:
+In order to get detailed summary statistics, we use the following function:
 ```{r}
 
+#Detailed summary statistics function
 ContStat = function(x,y) {
 #x must be a vector, not a dataframe
 #y is the number of decimal points to round data to
@@ -73,7 +77,6 @@ StatMean = summary(x)["Mean"]
 StatMin  = summary(x)["Min."]
 StatMax= summary(x)["Max."]
 StatSd  = sd(x)
-
 
 StatQuan = quantile(x,c(0.01,0.05,0.1,0.25,0.5,0.75,0.9,0.95,0.99))
 
@@ -89,10 +92,10 @@ return(ContStatDF)
 ```
 
 
-The following function will be used to output a histogram and a scatterplot:
-
+In order to output histograms and scatterplots of each variable, we use the following function:
 ```{r}
 
+#Histogram and Scatterplot of variables
 Graphs = function(x, y) {
 #vect must be a vector, not a dataframe
 #y is a string, the name of the variable of interest.  Used for labeling the graphs
@@ -111,23 +114,31 @@ return(output)
 
 ```
 
-Now let's take a closer look at each of the variables and its relationship with the variable of interest, homeValue.
+###Detailed Variable Examination
 
+We will now take a more detailed examination of each of the variables and their relationship with our variable of interest: homeValue. 
+
+------------------------------------------------------------------------
+**HomeValue**
 First, homeValue itself.  From the attached text file, homeValue is defined as _median price of single-family house in the neighborhood (measured in dollars)_.
+------------------------------------------------------------------------
 
 ```{r}
+#Examine HomeValue
 ggplot(data=data, aes(data$homeValue)) + geom_histogram()
 ContStat(data$homeValue,0)
 ```
 
+The range of the variable is 112,500 through 1,125,000  There dont appear to be any values that are unreasonable for the homeValue variable.  The histogram shows a strong right skew of the variable with many of the values clustered together between the first and third quartile.  While this is the target variable of interest, I will also create a log (homeValue) price and use both of them to find the model with the best fit.
 
- The range of the variable is 112,500 through 1,125,000  There dont appear to be any values that are unreasonable for the homeValue variable.  The histogram shows a strong right skew of the variable with many of the values clustered together between the first and third quartile.  While this is the target variable of interest, I will also create a log (homeValue) price and use both of them to find the model with the best fit.
-
- -----------------
+------------------------------------------------------------------------
+**CrimeRate_pc**
 
 Next lets take a look at the crimeRatepc variable which is defined as _crime rate per capita, measured by number of crimes per 1000 residents in neighborhood_.
+------------------------------------------------------------------------
 
 ```{r}
+#Examine CrimeRate_pc
 Graphs('crimeRate_pc', 'Crime Rate')
 ContStat(data$crimeRate_pc,2)
 ```
@@ -135,127 +146,178 @@ ContStat(data$crimeRate_pc,2)
 Crime rate per capita shows a slight negative correlation against Home Value.  However, there is an extremely large number of neighborhoods that have a crime rate of zero or close to zero.  The scatterplot shows that crime rate is more dispersed around areas of lower home value. That being said, there appears to be a small ceiling in the scatterplot- six points that all seem to have the same home value but with varying crime rates.  Lets take a closer look at those points.
 
 ```{r}
+#Examine ceiling effect
 subset(data, homeValue>1100000)
 ```
 
-
-Unexpectedly there seems to be a maximum limit on the homeValue.  These values probably represent that median price being greater than 1125000 which means that the model will not be able to accurately predict points that great since these rows could have a true median homeValue of 1125000 or even ten or fifty times that value. Having identified this ceiling, we should check to see if there is a floor for the minimum home value. 
+These points seem to indicate that there is a maximum limit on the homeValue. These values likely represent areas in which the median price is greater than 1125000. This means these data points are not likely to be continuous, and thus will be difficult to accurately predict these points as these observations could have a true median homeValue of 1125000 or even ten or fifty times that value. Having identified this ceiling, we should check to see if there is a floor for the minimum home value. 
 
 ```{r}
+#Examine potential floor effect
 subset(data, homeValue<126000)
 ```
 
 With only one value at the minimum, it seems unlikely that there is a minimum limit to the home value.
 
-A transformation for crime rate may be desired later, but all the other variables will be examined first.  Additionally, a decision on the steps to take with the maximum home value will be decided at the end of the variable examination.
 
----------------
+------------------------------------------------------------------------
+**NonRetailBusiness**
 
 Next let's take a look at the nonRetailBusiness variable which is defined as _the proportion of non-retail business acres per neighborhood_.
+------------------------------------------------------------------------
+
 
 ```{r}
+#Examine nonRetailBusiness
 Graphs('nonRetailBusiness', 'Non Retail Business')
 ContStat(data$nonRetailBusiness,2)
 ```
 
-The range for non retail business is 0.01 through 0.28.  There is also a negative correlation between the percentage of non retail business and the home value.  While the data on the left side of the scatterplot seems to be random according to Non Retail Business, on the right side of the scatterplot, they are lining up.  Let's take a deeper look.  Let's find the most common values for this variable.
+The range for non retail business is 0.01 through 0.28.  There is a negative correlation between the percentage of non retail business and the home value.  While the data on the left side of the scatterplot seems to be random according to Non Retail Business, on the right side of the scatterplot, the values create a series of lines.  We will now take a deeper look and find the most common values for this variable. 
 
 ```{r}
+#Frequencies of nonRetailBusiness
 freqs = count(data$nonRetailBusiness)
 freqs[with(freqs,order(-freq)),]
 ```
 
 There are 104 records here (over 25%!) with the same value of 0.1810 for the percentage of non retail business.  This is a curious result.  Lets examine these records in detail. 
 
-
 ```{r}
+#Subset data
 subset(data, nonRetailBusiness==.181)
 ```
 
-
-Not only do these records have the same value for Non Retail Business, but also for distance to highway and pupil teacher ratio.  This could indicate a probelem because 25% of our records have the same value for 3 of 10 variables.  It is very likely that these three can be used together for any model.
+Not only do these records have the same value for Non Retail Business, but also for distance to highway and pupil teacher ratio.  This could indicate a problem because 25% of our records have the same value for 3 of 10 variables.  It is very likely that these three can be used together for any model due to multicolinearity. 
 
 There was also a high number of records that had a value of 0.1958 for the non retail business variable.  Let's take a look at those as well. 
 
 ```{r}
+#Subset data
 subset(data, nonRetailBusiness==.1958)
 ```
 
 The same issue as above with another 25 sharing the same values.
 
 ```{r}
+#Subset data
 subset(data, nonRetailBusiness==.0814)
 ```
 
-The same issue with another 15 sharing the same values.  These 15 also have the same value for pollutionIndex.  Looking back, the 25 that had a nonRetailBusiness value of .1958 have only two different values.  The original 104 have different values, but I am now wary of a fourth variable.
+The same issue with another 15 sharing the same values.  These 15 also have the same value for pollutionIndex. In fact, when nonRetailBusiness values of 0.0620, 0.2189, 0.0397, 0.0990, 0.1001 and 0.0856 are further examined, we notice that they all have the same values for  pollutionindex, distance to highway and pupil teacher ratio.  These variables will likely not contribute much together, as they tend to vary together as a group.
 
-In fact, when nonRetailBusiness values of 0.0620, 0.2189, 0.0397, 0.0990, 0.1001 and 0.0856 are also looked at, they all have the same values for  pollutionindex, distance to highway and pupil teacher ratio.  These variables will likely not contribute much together, as they tend to vary together as a group.
-
----------------
-
+------------------------------------------------------------------------
+**WithWater**
 The next variable is withwater which is defined as  _whether the neighborhood is within 5 miles of a water body (lake, river, etc); 1 if true and 0 otherwise_
+------------------------------------------------------------------------
 
 As this is a binary variable, the functions created above are not appropriate.
 ```{r}
+#Examine withWater
 table(data$withWater)
 ggplot(data, aes(withWater, homeValue)) + geom_boxplot() +  scale_y_continuous(name = "Home Value", labels = comma) + scale_x_discrete(name = "With Water: 1 = Yes, 0 = No")
 ```
 
 With water tends to have a slightly higher median home value than without water. Neighborhoods without water do tend to see some higher home values, but these are considered outliers that fall outside of the upper whisker.
 
-----------------
+------------------------------------------------------------------------
+**ageHouse**
 
 Now we will examine ageHouse, which is defined as _proportion of houses built before 1950_
+------------------------------------------------------------------------
 
 ```{r}
+#Examine ageHouse
 Graphs('ageHouse', 'Percentage of house built before 1950')
 ContStat(data$ageHouse,1)
 ```
 
-The range here is from 2.9 through 100.0 with a left skew indicating many of these neighborhoods have older homes (built before 1950). With such age buckets, there is ambiguity between neighborhoods built in 1950 and those in 1850. This might account for the larger variation in older neighborhoods home value. Even so, the newer home neighborhoods seem to have higher home values given that there is less of a spread than for older homes. Average age of the home would be a better variable in this case.
+The range here is from 2.9 through 100.0 with a left skew indicating many of these neighborhoods have older homes (built before 1950). With such age buckets, there is ambiguity between neighborhoods built in 1950 and those in 1850. This might account for the larger variation in older neighborhoods home value. Even so, the newer neighborhoods seem to have higher home values, especially given that there is less of a spread than for older homes. Average age of the home would be a better variable in this case.
 
-----------------
+------------------------------------------------------------------------
+**distanceToCity**
 
 distanceToCity is next which is _distance to the nearest city (measured in miles)_
+------------------------------------------------------------------------
 
 ```{r}
+#Examine distanceToCity
 Graphs('distanceToCity', 'Miles to Nearest House')
 ContStat(data$distanceToCity ,1)
 ```
 
-Interestingly, the min value here is not 0 which indicates that none of these neighborhoods are actually in the city. The histogram tends to be right skewed, indicating that many neighborhoods are close to the city, while a few are over 40 miles from the city.
+Interestingly, the minimum value here is not 0 which indicates that none of these neighborhoods are actually in the city. The histogram tends to be right skewed, indicating that many neighborhoods are close to the city, while a few are over 40 miles from the city.
 
------------------
+------------------------------------------------------------------------
+**distanceToHighway**
 
-The next two variables in the dataset are distanceToHighway and pupilTeacherRatio.  However, as discussed above these two variables will not be used in the model, so further investigation of them is unnecessary.
-
-#I think we should probably talk about these... I can write them up tomorrow 
-
-The next variable is another percent, pctLowIncome which is _percentage of low income household in the neighborhood_
+distanceToHighway is next which is _distances to the nearest highway (measured in miles)_
+------------------------------------------------------------------------
 
 ```{r}
+#Examine distance to highway
+Graphs('distanceToHighway', 'Distance to highway in miles')
+ContStat(data$distanceToHighway ,1)
+```
+
+Distance to highway has a mean of 9.6, yet the most frequent value is 24, which occurs over 100 times in the dataset. There doesn't seem to be a clear relationship between home value and distance to highway, especially given the gap in values between 9 and 24. As stated previously, this variable probably will not contribute much to predicting home value.
+
+------------------------------------------------------------------------
+**pupilTeacherRatio**
+
+pupilTeacherRatio is next which is _average pupil-teacher ratio in all the schools in the neighborhood_
+------------------------------------------------------------------------
+
+```{r}
+#Examine pupil teacher ratio
+Graphs('pupilTeacherRatio', 'Pupil Teacher Ratio')
+ContStat(data$pupilTeacherRatio ,1)
+
+#Get mode of pupil teacher ratio
+Mode <- function(x) {
+  ux <- unique(x)
+  ux[which.max(tabulate(match(x, ux)))]
+}
+
+Mode(data$pupilTeacherRatio)
+```
+
+Pupil teacher ratio has a mean of 21.4, but has a strikingly frequent amount at 23.2. As discussed previously, this tends to covary with two of the other variables in the dataset. There does seem to be a negative relationship between pupil teacher ratio and home value.
+
+------------------------------------------------------------------------
+**pctLowIncome**
+
+The next variable is pctLowIncome which is _percentage of low income household in the neighborhood_
+------------------------------------------------------------------------
+
+```{r}
+#Examine pctLowIncome
 Graphs('pctLowIncome', 'Percent of low income households in the neighborhood')
 ContStat(data$pctLowIncome ,1)
 ```
 
 There is a very strong negative correlation on this scatterplot, unsurprisingly.  If you have a low income its unlikely that you can afford a house with a high value.  This variable is also right skewed, as demonstrated by the histogram. 
 
-----------------
+------------------------------------------------------------------------
+**pollutionIndex**
 
-The next variable is pollutionIndex.  Even though it is highly correlated with non retail business, distance to highway and pupil teacher ratio, we will investigate it because the philanthropist group is interested.
+The next variable is pollutionIndex which is defined as _scaled between 0 and 100, with 0 being the best and 100 being the worst (i.e. uninhabitable)._ Even though it is highly correlated with non retail business, distance to highway and pupil teacher ratio, we will investigate it because the philanthropist group is interested.
+------------------------------------------------------------------------
 
-Pollutionindex is defined as _scaled between 0 and 100, with 0 being the best and 100 being the worst (i.e. uninhabitable)_
 
 ```{r}
+#Examine pollutionIndex
 Graphs('pollutionIndex', 'Pollution Index')
 ContStat(data$pollutionIndex ,1)
 ```
 
 The scatterplot displays multiple segments: high home values and relativey low polution, medium home value and medium pollution, and low home value and high polution. There does seem to be a negative correlation between pollution index and home value, although the scatterplot shows a lot of variation. The histrogram shows a right skew.
 
-----------------
+------------------------------------------------------------------------
+**nBedRooms**
 
 The final variable is nBedRooms which is _the average number of bed rooms in the single family houses in the neighborhood_
+------------------------------------------------------------------------
 
 ```{r}
 Graphs('nBedRooms', 'Average Number of Bedrooms')
@@ -264,16 +326,15 @@ ContStat(data$nBedRooms ,1)
 
 Finally! A normally distributed variable.  This one is also positively correlated with home value.  This will likely be one of the most useful of the prediction variables. It ranges from 1.6 to 6.4, which are reasonable average bedrooms for houses.
 
-----------------
 
-
+##Decisions based off data exploration:
 From the original dataset, the following decisions were then made.
 
 1. Eliminate the variables non retail business, distance to highway and student pupil ratio  as they have too much colinearity with each other.  
 2. While pollutionindex is correlated with the three above, as the group specifically asked about it, it will be kept in the model for now.
-3. Create a transformation of home value, log home value, that will be used for fitting the model.  Whichever outcome variable performs the best will be used
+3. Create a transformation of home value, log home value, that will be used for fitting the model.  Whichever outcome variable performs the best will be used.
 4. No other transformations will be used at this time.  If the model fit is poor, then transformations will be considered.
-5. For home value, there are 8 records that are categorical rather than continuous.  These are the values that likely mean 1125000 or greater.  Because we dont know their true value at all, they will be discarded.
+5. For home value, there are 8 records that are categorical rather than continuous.  These are the values that likely mean 1125000 or greater.  Because we do not know the true value, we will not include them in our model.
 
 ----------------
 
@@ -291,13 +352,9 @@ ggplot(data=data, aes(data$loghomeValue)) + geom_histogram()
 ContStat(data$loghomeValue ,1)
 ```
 
-
-
 As expected, the log home value transformation has made the histogram more normal, although there is a tail to the left.
 
-
-
-We also will create three new binary variables, crimeRate_zero which indicates a very low crime rate and olderneighborhood which indicates if 90% or greater of the houses was built before 1950.  FInally we have newerneighborhood which indicates if 25% or less of the houses were built before 1950.
+We also will create three new binary variables, crimeRate_zero which indicates a very low crime rate and older neighborhood which indicates if 90% or greater of the houses was built before 1950.  Finally we have newerneighborhood which indicates if 25% or less of the houses were built before 1950.
 
 ```{r}
 
@@ -327,7 +384,6 @@ ggplot(data, aes(olderneighborhood, homeValue)) + geom_boxplot() +  scale_y_cont
 table(data$newerneighborhood)
 ggplot(data, aes(newerneighborhood, homeValue)) + geom_boxplot() +  scale_y_continuous(name = "Home Value", labels = comma) 
 
-
 ```
 
 All of the transformations box plots look reasonable.
@@ -339,7 +395,6 @@ Now we will create two models using the variables identifed above.  One will hav
 #Create Models
 
 lm = lm(homeValue ~ crimeRate_pc+crimeRate_zero+olderneighborhood +newerneighborhood +withWater+ageHouse+distanceToCity+pctLowIncome+pollutionIndex+nBedRooms, data=data)
-
 
 lmlog = lm(loghomeValue ~ crimeRate_pc+crimeRate_zero+olderneighborhood +newerneighborhood +withWater+ageHouse+distanceToCity+pctLowIncome+pollutionIndex+nBedRooms, data=data)
 
@@ -354,7 +409,6 @@ None of the newly created variables are significant.  Let's remove them and take
 #Create Models
 
 lm = lm(homeValue ~ crimeRate_pc+withWater+ageHouse+distanceToCity+pctLowIncome+pollutionIndex+nBedRooms, data=data)
-
 
 lmlog = lm(loghomeValue ~ crimeRate_pc+withWater+ageHouse+distanceToCity+pctLowIncome+pollutionIndex+nBedRooms, data=data)
 
@@ -464,10 +518,11 @@ The other variable that positively increases the value of the home is the number
 _Build a time-series model for the series in series02.txt and use it to perform a 24-step ahead forecast._
 
 ```{r}
+#Import data
 series <- read.table("series02.txt")
 series <- ts(series$V1)
 
-#Visualize the data
+#Plot data
 par(mfrow = c(2,2))
 plot.ts(series, col = "navy", xlab = "Time Period", ylab = "Values", main = "Time Series for Series 02")
 hist(series, main = "Histogram of Values of Series 02")
@@ -480,6 +535,7 @@ Notice the general structure of the series. There seems to be a long run average
 We suspect there is non-constant variance present in this series, so we will plot a correlogram of the squared values of a mean adjusted version of this series (adjusted so the mean is zero). 
 
 ```{r}
+#Autocorrelation Function
 par(mfrow = c(1,1))
 acf((series - mean(series))^2, main = "ACF of Squared Terms")
 ```
@@ -487,9 +543,12 @@ acf((series - mean(series))^2, main = "ACF of Squared Terms")
 The square values that are plotted are equivalent to the variance. What the statistically significant values indicate is that there is serial correlation, meaning conditional heteroskedasticity. In plain English, this means that the variance is not constant throughout the series, rather the variance depends on what window of time we are looking at. This violates a core assumption of stationarity, meaning we will have to use a non-stationary model to fit this data. 
 
 ```{r}
+
+#Fit model
 garch1 <- garch(series, trace = F)
 resids <- garch1$residuals[-1] #first value is NA
 
+#Examine Residuals
 par(mfrow = c(2,1))
 acf(resids, main = "ACF of GARCH(1,1) Residuals")
 acf(resids^2, main = "ACF of GARCH(1,1) Residuals^2")
@@ -498,9 +557,8 @@ garch1
 t(confint(garch1))
 ```
 
-Notice that with the ACF of both the series residuals and squared residuals there is no autocorrelation. This suggests the residuals are behaving like white noise and thus the model is a good fit. Examining the model itself 0 is not contained in the 95% confidence intervals for the coefficients, meaning that the coefficients are satatistically significant at the 95% level. 
+Notice that with the ACF of both the series residuals and squared residuals there is no autocorrelation. This suggests the residuals are behaving like white noise and thus the model is a good fit. Examining the model itself, 0 is not contained in the 95% confidence intervals for the coefficients, meaning that the coefficients are statistically significant at the 95% level. 
 
-#Question: Do we think that's good enough? Look into fitting GARCH better
 #Forecasting
 
 ##Question 3
@@ -508,10 +566,11 @@ Notice that with the ACF of both the series residuals and squared residuals ther
 _Build a time-series model for the series in series03.csv and use it to perform a 24-step ahead forecast_
 
 ```{r}
-#load data and do preliminary visualization
+#Load data
 series <- read.csv("series03.csv")
-series <- ts(series$V1)
+series <- ts(series)
 
+#Plot data
 par(mfrow = c(2,2))
 plot.ts(series, xlab = "Time Period", ylab = "Value", main = "Time Series Plot of Series 03", col = "navy")
 hist(series, main = "Histogram of Series 03")
@@ -519,11 +578,11 @@ acf(series, main = "ACF of Series 03")
 pacf(series, main = "PACF of Series 03")
 ```
 
-Notice from the time series plot that there is significant trend going on, long term upwards. The ACF shows significance through all past lags while the PACF is only siginficant for the first lag. There does not seem to be any seasonality. This looks like the realization of a random walk with drift process. 
+Notice from the time series plot that there is significant trend going on, specifically, a long term upward trend. The ACF shows significance through all past lags while the PACF is only siginficant for the first lag. There does not seem to be any seasonality. This looks like the realization of a random walk with drift process. 
 
 
 ```{r}
-#plot different time series to suggest differencing
+#Plot different time series to suggest differencing
 par(mfrow = c(3, 2))
 plot.ts(series, main = "Original Time Series")
 plot.ts(log(series), main = "Log of Time Series")
@@ -536,6 +595,7 @@ plot.ts(diff(log(series), d = 2), main = "Second Difference of Log Time Series")
 It is clear from the original time series plot that the series is not stationary. Before proceeding to build a model we must render the series as stationary. 
 
 ```{r}
+#Transform the series for stationarity
 par(mfrow = c(2,2))
 acf(diff(series), main = "ACF of First order Difference")
 pacf(diff(series), main = "PACF of First order Difference")
@@ -549,9 +609,12 @@ pacf(diff(log(series), d = 2), main = "PACF of Second Order Difference of Log")
 ```
 
 From examining these plots, it seems as though the second order difference provides the best transformation into white noise. In both cases the ACF shows a sharp cut off (suggesting an MA term) while the PACF gradually declines. The first order difference shows a lot of volatility in the PACF, suggesting correlations that are not easily captured. 
+
 Between the second order difference and the second order difference of the log, the second order difference of the log seems to look more like white noise. There are fewer significant autocorrelations (which might be due to sampling) in the second order difference of the log and it decays more smoothly. Therefore, we will use the second order difference of the log to estimate the model. 
 
 ```{r}
+
+#Function to select the best ARIMA based on AIC
 get.best.arima <- function(x.ts, maxord = c(1,1,1))
 {
   best.aic <- 1e8
@@ -576,9 +639,11 @@ mod
 t(confint(mod))
 ```
 
-Here we try using the auto.arima() function to find the best best. When using the auto.arima() function it suggests the first order difference of the log series. However, we saw above that this was not the best model examining the ACF and PACF so we instead specificed the order of differencing to be 2. When doing this, the suggested model is an ARIMA(2, 2, 1) model. However, examining the confidence intervals, we find that the 2 AR terms contain 0 in their confidence interval. That means we will fail to reject the null hypothesis these coefficients are 0. The MA term however does not contain 0 in its confidence interval and therefore we can reject the null hypothesis. Therefore, we will construct an ARIMA(0, 2, 1) model. 
+Here we try using the auto.arima() function to find the best model. When using the auto.arima() function it suggests the first order difference of the log series. However, we saw above that this was not the best model examining the ACF and PACF so we instead specificed the order of differencing to be 2. When doing this, the suggested model is an ARIMA(2, 2, 1) model. However, examining the confidence intervals, we find that the 2 AR terms contain 0 in their confidence interval. That means we will fail to reject the null hypothesis these coefficients are 0. The MA term however does not contain 0 in its confidence interval and therefore we can reject the null hypothesis. Therefore, we will construct an ARIMA(0, 2, 1) model. 
+
 
 ```{r}
+#Fit ARIMA (0,2,1)
 model <- arima(log(series), order = c(0, 2, 1))
 model
 t(confint(model))
@@ -588,7 +653,7 @@ t(confint(model))
 
 
 ```{r}
-#diagnostic plots of residuals
+#Diagnostic plots of residuals
 resids <- model$residuals
 plot.ts(resids, main = "Residuals of ARIMA Model")
 hist(resids, main = "Histogram of Residuals")
@@ -599,6 +664,7 @@ pacf(resids, main = "PACF of Residuals")
 These residual diagnostics suggest a reasonably good approximation of white noise. The ACF and PACF however do show quite a bit of volatility, so we will examine the squared residuals because we suspect there is non-constant variance. 
 
 ```{r}
+#Plot residuals and squared residuals
 par(mfrow = c(2,1))
 acf(resids, main = "ACF of Residuals")
 acf(resids^2, main = "ACF of Squared Residuals")
@@ -607,12 +673,12 @@ acf(resids^2, main = "ACF of Squared Residuals")
 As we had suspected, the squared residuals show statistically significant terms at different intervals. Clearly, this suggests there is non-constant variance. Therefore, we will fit a GARCH model to the residuals. 
 
 ```{r}
+#Fit GARCH model
 resid.garch = garch(resids, trace = FALSE)
 t(confint(resid.garch))
 acf(resid.garch$residuals[-1], main = "ACF of GARCH fitted Residuals")
 acf(resid.garch$residuals[-1]^2, main = "ACF of GARCH fitted Residuals^2")
 ```
-
 
 The GARCH model shows statistically significant coefficients at the 95% level, because 0 is not contained in the confidence intervals. The ACFs of both the GARCH residuals and residuals squared show no significant values, meaning a good fit to the residuals. 
 
@@ -625,10 +691,11 @@ The GARCH model shows statistically significant coefficients at the 95% level, b
 _Build a time-series model for the series in series04.csv and use it to perform a 24-step ahead forecast. Possible models include AR, MA, ARMA, ARIMA, Seasonal ARIMA, GARCH, ARIMA-GARCH, or Seasonal ARIMA-GARCH models. Note that the original series may need to be transformed before it be modelled._
 
 ```{r}
-#import data and run basic visualizations
+#Import data
 series <- read.csv("series04.csv")
 series <- ts(series$X25182)
 
+#Plot data
 par(mfrow = c(2,2))
 plot.ts(series, xlab = "Time Period", ylab = "Values", main = "Time Series Plot of Series 04")
 hist(series, main = "Histogram of Series 04")
@@ -639,7 +706,7 @@ pacf(series, main = "PACF of Series 04")
 From the time series plot it should be obvious that there is seasonality in this series, suggesting seasonal lag terms will be needed. The series shows a general upwards trend, and we would argue this series is definitely not stationary. The ACF show statistically significant lags persisting but at different heights, further suggesting non-stationarity and seasonality. 
 
 ```{r}
-#Transform series to make stationary
+#Transform series for stationary
 series <- read.csv("series04.csv")
 series <- ts(series$X25182, frequency = 12)
 
@@ -650,10 +717,11 @@ pacf(diff(log(series)), main = "PACF of Log First Difference")
 ```
 
 We are reimporting the series and setting the frequency to 12. We suspect the seasonality occurs on a monthly basis and counted 24 trough to peak cycles, indicating a seasonal period of 12. As is generally good practice we will take the log of the series and take the first difference to render the series more stationary. 
+
 The time series plot of the differenced series resembles white noise. However, the ACF shows regular significance suggesting seasonal terms will be needed there. The PACF also shows seasonality although somewhat less as it decreases eventually. Both plots also show significance at the first lag suggesting non-seasonal terms will also be needed. 
 
 ```{r}
-#function to find the best arima model. Credit to Cowpertwait and Metcalfe
+#Function to find the best ARIMA model. Credit to Cowpertwait and Metcalfe.
 get.best.arima.seas <- function(x.ts, maxord = c(1,1,1,1,1,1)) {
   best.aic <- 1e8
   n <- length(x.ts)
@@ -687,8 +755,9 @@ mod2
 We utilized both the auto.arima() function and the get.best.arima.seas() function (from the time series textbook) to acquire suggested model fits. However, we know the model should include a first difference and a seasonal difference from our previous investigation. Otherwise the model will not be stationary, and we will be unable to fit a model to it. The auto.arima() model's AIC is slightly higher `r AIC(mod)` versus `r AIC(mod2)`, but we believe that the model suggested by auto arima will better satisfy our assumptions. Therefore, we will investigate this model going forward. 
 
 ```{r}
+#Model comparisons
 t(confint(mod))
-#comparison model is (2, 1, 0)(2, 1, 2)[12] with AIC -779.5714
+#Base comparison model is (2, 1, 0)(2, 1, 2)[12] with AIC -779.5714
 mod3 <- arima(log(series), order = c(3, 1, 0), seasonal = list(order = c(2, 1, 2), 12))
 mod4 <- arima(log(series), order = c(2, 1, 1), seasonal = list(order = c(2, 1, 2), 12))
 mod5 <- arima(log(series), order = c(2, 1, 0), seasonal = list(order = c(3, 1, 2), 12))
@@ -701,9 +770,10 @@ AIC(mod6)
 
 Note that 0 is not contained in the confidence intervals of any of the terms for our model, which is currently ARIMA(2, 1, 0)(2, 1, 2)[12]. This means that we reject the null hypothesis and conclude that the evidence supports the alternative hypothesis that our model coefficients are different from 0. Further, above we have deliberately attempted to overfit our data by providing additional parameters. In all cases the AIC increases, suggesting that these models do not do a better job of explaining our data simply. In general, one wants a model that minimizes the AIC. 
 
-Therefore, we will continue with residual diagnostics for our chosen model
+Therefore, we will continue with residual diagnostics for our chosen model:
 
 ```{r}
+#Examine model residuals
 par(mfrow = c(2,2))
 resids <- mod$residuals
 plot.ts(resids, main = "Time Series Plot of Residuals")
@@ -725,11 +795,9 @@ There are some terms that are significant in the residual squared ACF, but none 
 We will note here that the residuals do not perfectly resemble white noise. There are still several lags showing statistical significant, which is not what we would want to see. However, we believe that we have fit the best possible model with the available information that we have. We would like to know more about the data and sampling methods to be able to fit the most appropriate possible model. We do however believe that we have satistified the conditions of stationarity and residuals behaving as white noise sufficiently to be able to forecast. 
 
 
+#NOTES SECTION AND APPENDIX: 
+
 #Check on Box test, is that what it says?
-
-
-#Appendix
-
 #probably can be ultimately deleted.
 
 ------------------
