@@ -452,7 +452,7 @@ cov(data$nBedRooms, lmlog$residuals)
 
 As all of these values are quite small, we believe it is reasonable to assume we have met exogeneity. This means that we can claim our model parameters are consistent, which means that the bias decreases as the number of observations increases. This means we are reasonably confident we can use these statistics to estimate our population parameters. 
 
-At this point we need to either transform variables or add interaction terms.
+Moving forward to improve our model, we can either transform variables or add interaction terms.
 
 From the original variable analysis, we know that crimerate_pc and pctLowIncome are skewed to the left.  Let's take a look at their distributions when square rooted.
 
@@ -471,23 +471,46 @@ Graphs('sqrtcrimeRate_pc', 'Square Root of Crime Rate in the neighborhood')
 ```
 
 With such a strong left skew, even the square root here does not make the data any more normal in the histogram.  However, model performance may have improved.
-I also want to take another look at withWater as that was a variable of interest.
 
 ```{r}
 
+#Adding square root of crime and square root of percent income
 lm = lm(homeValue ~ sqrtcrimeRate_pc+distanceToCity+olderneighborhood+sqrtpctIncome +pollutionIndex+nBedRooms+withWater, data=data)
 lmlog = lm(loghomeValue ~ (crimeRate_pc+distanceToCity+olderneighborhood+sqrtpctIncome +pollutionIndex+nBedRooms+withWater), data=data)
 
-lmlog = lm(loghomeValue ~ (crimeRate_pc+distanceToCity+olderneighborhood+pctLowIncome +pollutionIndex+nBedRooms+pctLowIncome*nBedRooms+withWater), data=data)
+```
 
-lmlog = lm(loghomeValue ~ (crimeRate_pc+distanceToCity+olderneighborhood+pctLowIncome +pollutionIndex+nBedRooms+pctLowIncome*nBedRooms+crimeRate_pc), data=data)
+The fit indicated by the r squared value is slightly better, adding the square root of crime and percent low income increased R^2 by a little more than 1%. Given that this is a small increase and it limits interpretability, we will not include this in our final model. The purpose of this model was to aid in explaining, rather than predicting. If we were predicting, we might choose to include these variables.
+
+Let's examine a few of the outliers:
+```{r}
+plot(lm)
+plot(lmlog)
+data[c(250,378,278,72,99,95,213),]
+
+```
+
+Quite a few of these outliers are areas of low income but have a relatively large number of bed rooms. Let's test for a potential interaction.
+
+```{r}
+#Add interaction term
+lm = lm(homeValue ~ (crimeRate_pc+distanceToCity+olderneighborhood+pctLowIncome +pollutionIndex+nBedRooms+pctLowIncome*nBedRooms+withWater), data=data)
+
+lmlog = lm(loghomeValue ~ (crimeRate_pc+distanceToCity+olderneighborhood+pctLowIncome +pollutionIndex+nBedRooms+pctLowIncome*nBedRooms+withWater), data=data)
 summary(lmlog)
 
 #Summarize Models
-summary(lm)
 summary(lmlog)
+summary(lm)
+```
 
+Wow! Adding this interaction term increased our R^2 by four percent, indicating that we are now explaining four percentage points more variance than we were previously. Let's briefly examine this interaction:
+
+```{r} 
+#Examine Relationship
 plot(data$nBedRooms,data$pctLowIncome)
+
+#Create high/low indicators based on the mean
 mean(data$pctLowIncome)
 data$lowincome[data$pctLowIncome >= 16] <- 1
 data$lowincome[data$pctLowIncome < 16] <- 0
@@ -496,71 +519,51 @@ data$fewrooms[data$nBedRooms >= 4.2] <- 1
 data$fewrooms[data$nBedRooms < 4.2] <- 0
 data$fewrooms <-as.factor(data$fewrooms)
 
+#plot relationships
 lows <- subset(data, lowincome==1)
 plot(lows$nBedRooms,lows$homeValue)
 highs <- subset(data, lowincome==0)
 plot(highs$nBedRooms,highs$homeValue)
+
+#Plot mean of income and number of bedrooms
 mean(highs$nBedRooms)
 mean(lows$nBedRooms)
 
+#Show means between group 1 (low income) by group 2 (few rooms)
 mytable <- table(data$homeValue, data$fewrooms, data$lowincome) 
 aggregate(data$homeValue, by=list(data$fewrooms, data$lowincome), mean)
+
 ```
 
-The fit indicated by the r squared value is slightly better. Let's take a look at the residual plots:
+This is very interesting. There is a clear positive relationship between number of bedrooms and home value among high income groups. However, among low income groups, there is not nearly as clear of a relationship between number of bedrooms and home value. This is also evident in the means across groups. For low income areas, the difference in home value between houses with few rooms and many rooms is 21,230.70, while the difference in home value for high income areas between few rooms and many rooms is 166,425.70. That's quite a difference and is an interesting finding. Let's plot the residuals one last time:
 
 ```{r}
 plot(lm)
 plot(lmlog)
-print(data([n = 250]
-data[c(250,378,278,72,99,95,213),]
-hist(sqrt(data$pctLowIncome))
-
-
-interactionMeans(lmlog)
-plot(data$nBedRooms,data$pctLowIncome)
-mean(data$pctLowIncome)
-data$lowincome[data$pctLowIncome >= 16] <- 1
-data$lowincome[data$pctLowIncome < 16] <- 0
-mean(data$nBedRooms)
-data$fewrooms[data$nBedRooms >= 4.2] <- 1
-data$fewrooms[data$nBedRooms < 4.2] <- 0
-data$fewrooms <-as.factor(data$fewrooms)
-
-lows <- subset(data, lowincome==1)
-plot(lows$nBedRooms,lows$homeValue)
-highs <- subset(data, lowincome==0)
-plot(highs$nBedRooms,highs$homeValue)
-mean(highs$nBedRooms)
-mean(lows$nBedRooms)
-
-mytable <- table(data$homeValue, data$fewrooms, data$lowincome) 
-aggregate(data$homeValue, by=list(data$fewrooms, data$lowincome), mean)
-
 ```
 
-
-There still seems to be heteroscedasticity.  However, no amount of other transformation helped.  Other transformations that were considered included, rounding the number of bedrooms to the nearest whole number, taking the log of distancetoCity and other binary considerations.
-
-The log home value model is the one we will select to answer the questions of the group.  However, due to the heteroscedasticity, we will need to ensure we are using robust standard errors.
+There still seems to be slight heteroscedasticity, but the plots look much better. To account for the slight heteroskedasticity, We will use robust standard errors to answer the questions of the group.
 
 
 ```{r}
-lmlog$newse<-vcovHC(lmlog)
-coeftest(lmlog,lmlog$newse)
+lm$newse<-vcovHC(lmlog)
+coeftest(lmlog,lm$newse)
 ```
+
 
 Specifically, the group wanted to know how environmental features affect the value of a home.  There are two variables in our model that address this, the binary withWater variable and the pollution index.
 
-Because we are using a log scale for home Value, we have to interpret this as follows.
+Because we are using a log scale for home Value, we have to interpret this as follows:
 
-The neighborhood being within 5 miles of water increases the value of the home 8.3% versus not being in that proximitiy.
+The neighborhood being within 5 miles of water had increases the value of the home 8.3% versus not being in that proximity (note, this was not significant after using robust SEs).
 
 For every one unit increase in the pollutionIndex as it is calculated, the value of the home descreases by 0.5%.
 
-The other variable that positively increases the value of the home is the number of bedrooms.  For each additional bedroom, the value of the home increases 10%.
+We did find a significant interaction between number of rooms and percent low income. For higher income areas, the more rooms typically means the higher value of house. For lower income areas, the relationship between number of rooms and house value is not as clear.
 
-#sqrt of home value#
+Additionally, we found that crime rate tended to show a 1.1% decrease in value, and distance to city showed a .6% decrease in home value. Being in a neighborhood wit 100% of homes built before 1950 tended to increase the value by 8.2%. 
+
+This evidence does suggest that environmental features affect the value of a home. They may not be as impactful as other features, but there is still a link between the environment and the value of a house.
 
 ##Question 2
 
