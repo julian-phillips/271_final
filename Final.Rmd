@@ -2,7 +2,7 @@
 title: "271 Final"
 author: "Glenn (Ted) Dunmire, Marlea Gwinn, Julian Phillips"
 date: "December 18, 2015"
-output: pdf_document
+output: word_document
 ---
 
 ##Question 1
@@ -17,7 +17,7 @@ _The philanthropist group hires a think tank to examine the relationship between
 #Set Directory
 
 #Ted
-#setwd("~/Documents/271 Final")
+setwd("~/Documents/271 Final")
 
 #Marlea
 #setwd("C://Users/gwina003/Downloads/Final")
