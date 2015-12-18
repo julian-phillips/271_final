@@ -1,7 +1,7 @@
 ---
 title: "271 Final"
 author: "Glenn (Ted) Dunmire, Marlea Gwinn, Julian Phillips"
-date: "December 7, 2015"
+date: "December 18, 2015"
 output: pdf_document
 ---
 
@@ -17,7 +17,7 @@ _The philanthropist group hires a think tank to examine the relationship between
 #Set Directory
 
 #Ted
-setwd("~/Documents/271 Final")
+#setwd("~/Documents/271 Final")
 
 #Marlea
 #setwd("C://Users/gwina003/Downloads/Final")
@@ -120,9 +120,10 @@ We will now take a more detailed examination of each of the variables and their 
 
 ------------------------------------------------------------------------
 **HomeValue**
-First, homeValue itself.  From the attached text file, homeValue is defined as _median price of single-family house in the neighborhood (measured in dollars)_.
+First, homeValue itself.  From the attached text file, homeValue is defined as _median price of single-family house in the_
+_neighborhood (measured in dollars)_.
 ------------------------------------------------------------------------
-
+getwd()
 ```{r}
 #Examine HomeValue
 ggplot(data=data, aes(data$homeValue)) + geom_histogram()
@@ -208,7 +209,8 @@ The same issue with another 15 sharing the same values.  These 15 also have the 
 
 ------------------------------------------------------------------------
 **WithWater**
-The next variable is withwater which is defined as  _whether the neighborhood is within 5 miles of a water body (lake, river, etc); 1 if true and 0 otherwise_
+The next variable is withwater which is defined as  _whether the neighborhood is within 5 miles of a water_
+_body (lake, river, etc); 1 if true and 0 otherwise_
 ------------------------------------------------------------------------
 
 As this is a binary variable, the functions created above are not appropriate.
@@ -401,9 +403,13 @@ Let's remove the nonsignificant variables and take another look:
 ```{r}
 #Create Models
 
-lm = lm(homeValue ~ crimeRate_pc+withWater+olderneighborhood+distanceToCity+pctLowIncome+pollutionIndex+nBedRooms, data=data)
+lm = lm(homeValue ~ crimeRate_pc+withWater+olderneighborhood+
+                    distanceToCity+pctLowIncome+
+                    pollutionIndex+nBedRooms, data=data)
 
-lmlog = lm(loghomeValue ~ crimeRate_pc+withWater+olderneighborhood+distanceToCity+pctLowIncome+pollutionIndex+nBedRooms, data=data)
+lmlog = lm(loghomeValue ~ crimeRate_pc+withWater+olderneighborhood+
+                          distanceToCity+pctLowIncome+
+                        pollutionIndex+nBedRooms, data=data)
 
 #Summarize Models
 summary(lm)
@@ -413,8 +419,8 @@ summary(lmlog)
 Now everything in the model is significantly accounting for variance. Lets take a look at histograms of the residuals. 
 
 ```{r}
-lmresid = ggplot(data=lm, aes(lm$residuals)) + geom_histogram() +  ggtitle("Histogram of Home Value Model Residuals")
-lmlogresid =ggplot(data=lmlog, aes(lmlog$residuals)) + geom_histogram() +  ggtitle("Histogram of Log Home Value Model Residuals")
+lmresid = ggplot(data=lm, aes(lm$residuals)) + geom_histogram() 
+lmlogresid =ggplot(data=lmlog, aes(lmlog$residuals)) + geom_histogram() 
   
 grid.arrange(lmresid, lmlogresid, ncol=2,nrow=1)
 
@@ -475,8 +481,10 @@ With such a strong left skew, even the square root here does not make the data a
 ```{r}
 
 #Adding square root of crime and square root of percent income
-lm = lm(homeValue ~ sqrtcrimeRate_pc+distanceToCity+olderneighborhood+sqrtpctIncome +pollutionIndex+nBedRooms+withWater, data=data)
-lmlog = lm(loghomeValue ~ (crimeRate_pc+distanceToCity+olderneighborhood+sqrtpctIncome +pollutionIndex+nBedRooms+withWater), data=data)
+lm = lm(homeValue ~ sqrtcrimeRate_pc+distanceToCity+olderneighborhood+sqrtpctIncome 
+            +pollutionIndex+nBedRooms+withWater, data=data)
+lmlog = lm(loghomeValue ~ (crimeRate_pc+distanceToCity+olderneighborhood+sqrtpctIncome
+                  +pollutionIndex+nBedRooms+withWater), data=data)
 
 ```
 
@@ -546,22 +554,35 @@ There still seems to be slight heteroscedasticity, but the plots look much bette
 
 
 ```{r}
-lm$newse<-vcovHC(lmlog)
-coeftest(lmlog,lm$newse)
+lmlog$newse<-vcovHC(lmlog)
+coeftest(lmlog,lmlog$newse)
 ```
+
+
+Once we move to a robust standard error, there are some variables that are no long significant.  Olderneighborhood no longer is significant with robust standard errors so we will remove it.
+
+```{r}
+lmlog = lm(loghomeValue ~ (crimeRate_pc+distanceToCity+pctLowIncome +pollutionIndex+nBedRooms+pctLowIncome*nBedRooms+withWater), data=data)
+
+
+lmlog$newse<-vcovHC(lmlog)
+coeftest(lmlog,lmlog$newse)
+```
+
+This is the model to be used.
 
 
 Specifically, the group wanted to know how environmental features affect the value of a home.  There are two variables in our model that address this, the binary withWater variable and the pollution index.
 
 Because we are using a log scale for home Value, we have to interpret this as follows:
 
-The neighborhood being within 5 miles of water had increases the value of the home 8.3% versus not being in that proximity.
+The neighborhood being within 5 miles of water had increases the value of the home 8.2% versus not being in that proximity.
 
-For every one unit increase in the pollutionIndex as it is calculated, the value of the home descreases by 0.5%.
+For every one unit increase in the pollutionIndex as it is calculated, the value of the home descreases by 0.45%.
 
 We did find a significant interaction between number of rooms and percent low income. For higher income areas, the more rooms typically means the higher value of house. For lower income areas, the relationship between number of rooms and house value is not as clear.
 
-Additionally, we found that crime rate tended to show a 1.1% decrease in value, and distance to city showed a .6% decrease in home value. Being in a neighborhood wit 100% of homes built before 1950 tended to increase the value by 8.2%. 
+Additionally, we found that crime rate tended to show a 1.0% decrease in value per unit increase in crime rate, and distance to city showed a .06% decrease in home value as the neighborhood got closer to the city. 
 
 This evidence does suggest that environmental features affect the value of a home. They may not be as impactful as other features, but there is still a link between the environment and the value of a house.
 
@@ -895,68 +916,4 @@ lines(c(rep(NA, 285), exp(preds$upper[,2])), col = "red")
 Again the blue value is the mean prediction while the red represent 95% confidence intervals. Notice the upper limit really takes off, which is probably in part due to the general rising trend. The mean predictions actually look very logically like what might be expected from this series. 
 
 
-#NOTES SECTION AND APPENDIX: 
 
-#probably can be ultimately deleted.
-
-------------------
-
-#I did the following to see if the issue was the variables or the records before I found the scope of the problem.  Tossing all the records is too much, but I didnt want to delete this yet.
-
-With the identification of variables that seem to strongly correlate, I want to do a couple of scatterplot matrices.
-
-I will start with the first four identified.
-
-```{r}
-data3 = data[,c("nonRetailBusiness","distanceToHighway","pupilTeacherRatio","pollutionIndex")]
-ggpairs(data3)
-
-```
-
-
-Surprisingly, there is not a super strong correlation between the variables (except between Non Retail Business and pollutionindex).  Perhaps the problem is with those records then and not the variables themselves.  Another subset will be created will just those 144 records first identified and anoother scatterplot matrix created.
-
-
-```{r}
-data2 = data[,c("nonRetailBusiness","distanceToHighway","pupilTeacherRatio","pollutionIndex")]
-data3 = subset(data2, nonRetailBusiness==.181|nonRetailBusiness==.1958|nonRetailBusiness==.0814 )
-ggpairs(data3)
-
-```
-
-There is far too much colinearity with these records for comfort.  I want to examine these 144 records in a scatterplot matrix with the other variables selected.
-
-```{r}
-data2 = subset(data, nonRetailBusiness==.181|nonRetailBusiness==.1958|nonRetailBusiness==.0814 )
-data3 = data2[,c("crimeRate_pc","ageHouse","distanceToCity","pctLowIncome","homeValue","nBedRooms")]
-ggpairs(data3)
-
-```
-
-
-The matrix here causes me no concern.  I am still unsure of whether or records or the variables are the problem here, so I will use the other 256 records and do the same two matrices.
-
-```{r}
-data2 = data[,c("nonRetailBusiness","distanceToHighway","pupilTeacherRatio","pollutionIndex")]
-data3 = subset(data2, nonRetailBusiness!=.181&nonRetailBusiness!=.1958&nonRetailBusiness!=.0814 )
-ggpairs(data3)
-
-```
-
-
-
-```{r}
-data2 = subset(data, nonRetailBusiness!=.181&nonRetailBusiness!=.1958&nonRetailBusiness!=.0814 )
-data3 = data2[,c("crimeRate_pc","ageHouse","distanceToCity","pctLowIncome","homeValue","nBedRooms")]
-ggpairs(data3)
-
-```
-
-After all the examination of the variables and records, I have decided that the problem is with those 144 records.  I will create a new subset of the remaining 256 and continue to use all variables.
-
-```{r}
-data = subset(data, nonRetailBusiness!=.181&nonRetailBusiness!=.1958&nonRetailBusiness!=.0814 )
-
-```
-
------------------
