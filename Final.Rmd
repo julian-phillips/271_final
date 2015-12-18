@@ -330,7 +330,7 @@ Finally! A normally distributed variable.  This one is also positively correlate
 ##Decisions based off data exploration:
 From the original dataset, the following decisions were then made.
 
-1. Eliminate the variables non retail business, distance to highway and student pupil ratio  as they have too much colinearity with each other.  
+1. Eliminate the variables non retail business, distance to highway and student pupil ratio  as they have too much colinearity with each other. We suspect there may be some sampling error or additional information that we would have to ask the client for. 
 2. While pollutionindex is correlated with the three above, as the group specifically asked about it, it will be kept in the model for now.
 3. Create a transformation of home value, log home value, that will be used for fitting the model.  Whichever outcome variable performs the best will be used.
 4. No other transformations will be used at this time.  If the model fit is poor, then transformations will be considered.
@@ -448,9 +448,29 @@ plot(lm)
 plot(lmlog)
 ```
 
-Both models show evidence of heteroscedasticity in their residuals vs fitted plots.  The log home value model is worse in this sense than the normal one. Both Q-Q plots show that the residuals are pretty normally distributed.
+Both models show evidence of heteroscedasticity in their residuals vs fitted plots. We would want the residuals to be an even band with no obvious clustering or curvature. Clearly this is not the case. The log home value model is worse in this sense than the normal one. Both Q-Q plots show that the residuals are pretty normally distributed. We know this because they closely follow the straight line which would indicate a normal distribution. 
 
-Both scale-location plots also indicate some heteroscedasticity.  Finally, the leverage plot indicates that while there are points with a large amount of leverage, they are within our bounds.
+Both scale-location plots also indicate some heteroscedasticity. Again, if the errors were homoskedastic we would expect an even distribution of errors. There is both clustering and curvature indicated by the smoothing function. Finally, the leverage plot indicates that while there are points with a large amount of leverage, they are within our bounds.
+
+There are several issues with these plots that suggest we do not perfectly meet the definition of the Classical Linear Model. However, we can say that we have met the asymptotic assumptions of linear regression. Generally asymptotic assumptions can be used on a sample that is greater than 30, which we clearly have met. We have already met the first three conditions, by having linear parameters, assuming the data came from a random sample, and showing no multicolinearity. Therefore, we will test for exogeneity. Exogeneity is defined as no correlation between a particular x variable and the error terms in our model. 
+
+```{r}
+#Test regular model
+cov(data$crimeRate_pc, lm$residuals)
+cov(data$distanceToCity, lm$residuals)
+cov(data$pctLowIncome, lm$residuals)
+cov(data$pollutionIndex, lm$residuals)
+cov(data$nBedRooms, lm$residuals)
+
+#Test log model
+cov(data$crimeRate_pc, lmlog$residuals)
+cov(data$distanceToCity, lmlog$residuals)
+cov(data$pctLowIncome, lmlog$residuals)
+cov(data$pollutionIndex, lmlog$residuals)
+cov(data$nBedRooms, lmlog$residuals)
+```
+
+As all of these values are quite small, we believe it is reasonable to assume we have met exogeneity. This means that we can claim our model parameters are consistent, which means that the bias decreases as the number of observations increases. This means we are reasonably confident we can use these statistics to estimate our population parameters. 
 
 At this point we need to either transform variables or add interaction terms.
 
@@ -543,23 +563,35 @@ acf((series - mean(series))^2, main = "ACF of Squared Terms")
 The square values that are plotted are equivalent to the variance. What the statistically significant values indicate is that there is serial correlation, meaning conditional heteroskedasticity. In plain English, this means that the variance is not constant throughout the series, rather the variance depends on what window of time we are looking at. This violates a core assumption of stationarity, meaning we will have to use a non-stationary model to fit this data. 
 
 ```{r}
+garch.fit <- garchFit(~garch(1,1), data = series, trace = FALSE, include.mean = FALSE)
+garch.fit
 
-#Fit model
-garch1 <- garch(series, trace = F)
-resids <- garch1$residuals[-1] #first value is NA
-
-#Examine Residuals
 par(mfrow = c(2,1))
-acf(resids, main = "ACF of GARCH(1,1) Residuals")
-acf(resids^2, main = "ACF of GARCH(1,1) Residuals^2")
-Box.test(resids, type = "Ljung-Box")
-garch1
-t(confint(garch1))
+#Note standardized residuals because garchFit calculates residuals differently
+acf(residuals(garch.fit, standardize = TRUE), main = "Residuals of Garch Model")
+acf(residuals(garch.fit, standardize = TRUE)^2, main = "Residuals of Garch Model Squared")
+Box.test(residuals(garch.fit, standardize = TRUE), type = "Ljung-Box")
 ```
 
-Notice that with the ACF of both the series residuals and squared residuals there is no autocorrelation. This suggests the residuals are behaving like white noise and thus the model is a good fit. Examining the model itself, 0 is not contained in the 95% confidence intervals for the coefficients, meaning that the coefficients are statistically significant at the 95% level. 
+Notice that with the ACF of both the series residuals and squared residuals there is no autocorrelation. This suggests the residuals are behaving like white noise and thus the model is a good fit. The residuals also fail to reject the null hypothesis that the residuals are independent. The coefficients are all statistically significant, meaning we reject the null hypothesis that the coefficients are 0. Therefore, we believe this model is a good fit for forecasting. 
 
-#Forecasting
+```{r}
+preds <- predict(garch.fit, n.ahead = 24)
+lower <- preds$meanForecast - 1.96 * preds$meanError
+upper <- preds$meanForecast + 1.96 * preds$meanError
+cbind(lower, preds$meanForecast, upper)
+```
+
+We have printed the forecast above. The 0 predicted value should make sense, this is a model of volatility. We will plot the results below
+
+```{r}
+par(mfrow = c(1,1))
+plot.ts(c(series, preds$meanForecast), main = "Forecast Plot")
+lines(c(rep(NA, 792), lower), col = "blue")
+lines(c(rep(NA, 792), upper), col = "blue")
+```
+
+The two blue lines represent the boundary of the predicted volatility. These seem to be in line with the long run average of the series. 
 
 ##Question 3
 
@@ -568,7 +600,7 @@ _Build a time-series model for the series in series03.csv and use it to perform 
 ```{r}
 #Load data
 series <- read.csv("series03.csv")
-series <- ts(series)
+series <- ts(series$X9.88)
 
 #Plot data
 par(mfrow = c(2,2))
@@ -674,17 +706,34 @@ As we had suspected, the squared residuals show statistically significant terms 
 
 ```{r}
 #Fit GARCH model
-resid.garch = garch(resids, trace = FALSE)
-t(confint(resid.garch))
-acf(resid.garch$residuals[-1], main = "ACF of GARCH fitted Residuals")
-acf(resid.garch$residuals[-1]^2, main = "ACF of GARCH fitted Residuals^2")
+garch.fit <- garchFit(~garch(1,1), data = resids, include.mean = FALSE, trace = FALSE)
+garch.fit
+
+par(mforw = c(2,1))
+acf(residuals(garch.fit, standardize = TRUE),  main = "ACF of GARCH Residuals")
+acf(residuals(garch.fit, standardize = TRUE)^2, main = "ACF of GARCH Residuals Squared")
+Box.test(residuals(garch.fit, standardize = TRUE), type = "Ljung-Box")
 ```
 
-The GARCH model shows statistically significant coefficients at the 95% level, because 0 is not contained in the confidence intervals. The ACFs of both the GARCH residuals and residuals squared show no significant values, meaning a good fit to the residuals. 
+The GARCH model shows statistically significant coefficients, meaning we will reject our null hypothesis that the coefficients are 0. Further, notice that the residuals now are not significant, meaning this series approximates white noise. The residuals also fail to reject the null hypothesis of the Ljung-Box test, meaning we cannot say the residuals are not independent. Therefore, we will use this model for forecasting. 
 
-#Forecast?
+According to Cowpertwait, the fitted GARCH model on the residuals will not affect the average prediction, because the mean of residual errors is 0. However, it does affect the variance of predicted values. Therefore, we will use the ARIMA component of our model to provide point estimates for our forecast and the GARCH model to supply the standard error for the confidence interval. 
 
+```{r}
+preds <- forecast(model, h = 24)
+std <- predict(garch.fit, n.ahead = 24)
 
+#set confidence intervals
+lower <- c(preds$mean - 1.96 * std$meanError)
+upper <- c(preds$mean + 1.96 * std$meanError)
+#display
+cbind(lower, preds$mean, upper)
+
+par(mfrow = c(1,1))
+plot.ts(c(diff(log(series), d = 2), preds$mean), xlab = "Time Period", ylab = "Value", main = "Time Series Plot with Forecast")
+```
+
+#Still can't work out
 
 ##Question 4
 
@@ -794,6 +843,14 @@ There are some terms that are significant in the residual squared ACF, but none 
 
 We will note here that the residuals do not perfectly resemble white noise. There are still several lags showing statistical significant, which is not what we would want to see. However, we believe that we have fit the best possible model with the available information that we have. We would like to know more about the data and sampling methods to be able to fit the most appropriate possible model. We do however believe that we have satistified the conditions of stationarity and residuals behaving as white noise sufficiently to be able to forecast. 
 
+```{r}
+preds <- forecast(mod, h = 24)
+
+lower <- preds$mean - preds$lower[,2]
+upper <- preds$mean + preds$upper[,2]
+
+cbind(lower, exp(preds$mean), upper)
+```
 
 #NOTES SECTION AND APPENDIX: 
 
