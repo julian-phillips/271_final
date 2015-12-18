@@ -330,13 +330,14 @@ Finally! A normally distributed variable.  This one is also positively correlate
 ##Decisions based off data exploration:
 From the original dataset, the following decisions were then made.
 
-1. Eliminate the variables non retail business, distance to highway and student pupil ratio  as they have too much colinearity with each other. We suspect there may be some sampling error or additional information that we would have to ask the client for. 
+1. Eliminate the variables non retail business, distance to highway and student pupil ratio  as they have too much colinearity with each other. We suspect there may be some sampling error or additional information that we would have to ask the client for.
 2. While pollutionindex is correlated with the three above, as the group specifically asked about it, it will be kept in the model for now.
 3. Create a transformation of home value, log home value, that will be used for fitting the model.  Whichever outcome variable performs the best will be used.
 4. No other transformations will be used at this time.  If the model fit is poor, then transformations will be considered.
 5. For home value, there are 8 records that are categorical rather than continuous.  These are the values that likely mean 1125000 or greater.  Because we do not know the true value, we will not include them in our model.
 
 ----------------
+
 
 First, we will subset the data and transform some of the variables:
 
@@ -354,23 +355,19 @@ ContStat(data$loghomeValue ,1)
 
 As expected, the log home value transformation has made the histogram more normal, although there is a tail to the left.
 
-We also will create three new binary variables, crimeRate_zero which indicates a very low crime rate and older neighborhood which indicates if 90% or greater of the houses was built before 1950.  Finally we have newerneighborhood which indicates if 25% or less of the houses were built before 1950.
+We also will create two new binary variables, crimeRate_zero which indicates a very low crime rate and older neighborhood which indicates if 100% of the houses was built before 1950.  Finally we have newerneighborhood which indicates if 25% or less of the houses were built before 1950.
 
 ```{r}
 
-#Transform Variables
+#Create Indicator Variables
 
-data$crimeRate_zero[data$crimeRate_pc < 1.0] <- 1
-data$crimeRate_zero[data$crimeRate_pc >= 1.0] <- 0
+data$crimeRate_zero[data$crimeRate_pc < 30.0] <- 1
+data$crimeRate_zero[data$crimeRate_pc >= 30.0] <- 0
 data$crimeRate_zero <-as.factor(data$crimeRate_zero)
 
-data$olderneighborhood [data$ageHouse >= 90.00] <- 1
-data$olderneighborhood [data$ageHouse < 90.00] <- 0
+data$olderneighborhood [data$ageHouse >= 100.00] <- 1
+data$olderneighborhood [data$ageHouse < 100.00] <- 0
 data$olderneighborhood <- as.factor(data$olderneighborhood )
-
-data$newerneighborhood[data$ageHouse <= 10.00] <- 1
-data$newerneighborhood[data$ageHouse > 10.00] <- 0
-data$newerneighborhood<- as.factor(data$newerneighborhood)
 
 #crimeRate_zero
 table(data$crimeRate_zero)
@@ -379,10 +376,6 @@ ggplot(data, aes(crimeRate_zero, homeValue)) + geom_boxplot() +  scale_y_continu
 #olderneighborhood
 table(data$olderneighborhood)
 ggplot(data, aes(olderneighborhood, homeValue)) + geom_boxplot() +  scale_y_continuous(name = "Home Value", labels = comma) 
-
-#newerneighborhood
-table(data$newerneighborhood)
-ggplot(data, aes(newerneighborhood, homeValue)) + geom_boxplot() +  scale_y_continuous(name = "Home Value", labels = comma) 
 
 ```
 
@@ -394,43 +387,30 @@ Now we will create two models using the variables identifed above.  One will hav
 ```{r}
 #Create Models
 
-lm = lm(homeValue ~ crimeRate_pc+crimeRate_zero+olderneighborhood +newerneighborhood +withWater+ageHouse+distanceToCity+pctLowIncome+pollutionIndex+nBedRooms, data=data)
+lm = lm(homeValue ~ crimeRate_pc+crimeRate_zero+olderneighborhood  +withWater+ageHouse+distanceToCity+pctLowIncome+pollutionIndex+nBedRooms, data=data)
 
-lmlog = lm(loghomeValue ~ crimeRate_pc+crimeRate_zero+olderneighborhood +newerneighborhood +withWater+ageHouse+distanceToCity+pctLowIncome+pollutionIndex+nBedRooms, data=data)
+lmlog = lm(loghomeValue ~ crimeRate_pc+crimeRate_zero+olderneighborhood  +withWater+ageHouse+distanceToCity+pctLowIncome+pollutionIndex+nBedRooms, data=data)
 
 #Summarize Models
 summary(lm)
 summary(lmlog)
 ```
 
-None of the newly created variables are significant.  Let's remove them and take another look.
+Let's remove the nonsignificant variables and take another look:
 
 ```{r}
 #Create Models
 
-lm = lm(homeValue ~ crimeRate_pc+withWater+ageHouse+distanceToCity+pctLowIncome+pollutionIndex+nBedRooms, data=data)
+lm = lm(homeValue ~ crimeRate_pc+withWater+olderneighborhood+distanceToCity+pctLowIncome+pollutionIndex+nBedRooms, data=data)
 
-lmlog = lm(loghomeValue ~ crimeRate_pc+withWater+ageHouse+distanceToCity+pctLowIncome+pollutionIndex+nBedRooms, data=data)
-
-#Summarize Models
-summary(lm)
-summary(lmlog)
-```
-
-
-In both models, withwater and ageHouse are far less significant than the other 5 variables.  I will remove them and recreate the models.
-
-```{r}
-
-lm = lm(homeValue ~ crimeRate_pc+distanceToCity+pctLowIncome+pollutionIndex+nBedRooms, data=data)
-lmlog = lm(loghomeValue ~ crimeRate_pc+distanceToCity+pctLowIncome+pollutionIndex+nBedRooms, data=data)
+lmlog = lm(loghomeValue ~ crimeRate_pc+withWater+olderneighborhood+distanceToCity+pctLowIncome+pollutionIndex+nBedRooms, data=data)
 
 #Summarize Models
 summary(lm)
 summary(lmlog)
 ```
 
-The r squared values did not change which is unsurprising since the two variables removed were not adding a whole lot of new information to the model.  Lets take a look at histograms of the residuals. 
+Now everything in the model is significantly accounting for variance. Lets take a look at histograms of the residuals. 
 
 ```{r}
 lmresid = ggplot(data=lm, aes(lm$residuals)) + geom_histogram() +  ggtitle("Histogram of Home Value Model Residuals")
@@ -477,7 +457,6 @@ At this point we need to either transform variables or add interaction terms.
 From the original variable analysis, we know that crimerate_pc and pctLowIncome are skewed to the left.  Let's take a look at their distributions when square rooted.
 
 
-
 ```{r}
 data$sqrtpctIncome = sqrt(data$pctLowIncome)
 Graphs('sqrtpctIncome', 'Square Root of Percent of low income households in the neighborhood')
@@ -496,25 +475,75 @@ I also want to take another look at withWater as that was a variable of interest
 
 ```{r}
 
-lm = lm(homeValue ~ sqrtcrimeRate_pc+distanceToCity+sqrtpctIncome +pollutionIndex+nBedRooms+withWater, data=data)
-lmlog = lm(loghomeValue ~ (crimeRate_pc+distanceToCity+sqrtpctIncome +pollutionIndex+nBedRooms+withWater), data=data)
+lm = lm(homeValue ~ sqrtcrimeRate_pc+distanceToCity+olderneighborhood+sqrtpctIncome +pollutionIndex+nBedRooms+withWater, data=data)
+lmlog = lm(loghomeValue ~ (crimeRate_pc+distanceToCity+olderneighborhood+sqrtpctIncome +pollutionIndex+nBedRooms+withWater), data=data)
+
+lmlog = lm(loghomeValue ~ (crimeRate_pc+distanceToCity+olderneighborhood+pctLowIncome +pollutionIndex+nBedRooms+pctLowIncome*nBedRooms+withWater), data=data)
+
+lmlog = lm(loghomeValue ~ (crimeRate_pc+distanceToCity+olderneighborhood+pctLowIncome +pollutionIndex+nBedRooms+pctLowIncome*nBedRooms+crimeRate_pc), data=data)
+summary(lmlog)
 
 #Summarize Models
 summary(lm)
 summary(lmlog)
+
+plot(data$nBedRooms,data$pctLowIncome)
+mean(data$pctLowIncome)
+data$lowincome[data$pctLowIncome >= 16] <- 1
+data$lowincome[data$pctLowIncome < 16] <- 0
+mean(data$nBedRooms)
+data$fewrooms[data$nBedRooms >= 4.2] <- 1
+data$fewrooms[data$nBedRooms < 4.2] <- 0
+data$fewrooms <-as.factor(data$fewrooms)
+
+lows <- subset(data, lowincome==1)
+plot(lows$nBedRooms,lows$homeValue)
+highs <- subset(data, lowincome==0)
+plot(highs$nBedRooms,highs$homeValue)
+mean(highs$nBedRooms)
+mean(lows$nBedRooms)
+
+mytable <- table(data$homeValue, data$fewrooms, data$lowincome) 
+aggregate(data$homeValue, by=list(data$fewrooms, data$lowincome), mean)
 ```
 
-The fit indicated by the r squared value is slightly better. Interestingly, pollutionIndex is becoming far less significant.  We will keep it in the model for now and look at the residual plots.
+The fit indicated by the r squared value is slightly better. Let's take a look at the residual plots:
 
 ```{r}
 plot(lm)
 plot(lmlog)
+print(data([n = 250]
+data[c(250,378,278,72,99,95,213),]
+hist(sqrt(data$pctLowIncome))
+
+
+interactionMeans(lmlog)
+plot(data$nBedRooms,data$pctLowIncome)
+mean(data$pctLowIncome)
+data$lowincome[data$pctLowIncome >= 16] <- 1
+data$lowincome[data$pctLowIncome < 16] <- 0
+mean(data$nBedRooms)
+data$fewrooms[data$nBedRooms >= 4.2] <- 1
+data$fewrooms[data$nBedRooms < 4.2] <- 0
+data$fewrooms <-as.factor(data$fewrooms)
+
+lows <- subset(data, lowincome==1)
+plot(lows$nBedRooms,lows$homeValue)
+highs <- subset(data, lowincome==0)
+plot(highs$nBedRooms,highs$homeValue)
+mean(highs$nBedRooms)
+mean(lows$nBedRooms)
+
+mytable <- table(data$homeValue, data$fewrooms, data$lowincome) 
+aggregate(data$homeValue, by=list(data$fewrooms, data$lowincome), mean)
+
 ```
 
 
 There still seems to be heteroscedasticity.  However, no amount of other transformation helped.  Other transformations that were considered included, rounding the number of bedrooms to the nearest whole number, taking the log of distancetoCity and other binary considerations.
 
 The log home value model is the one we will select to answer the questions of the group.  However, due to the heteroscedasticity, we will need to ensure we are using robust standard errors.
+
 
 ```{r}
 lmlog$newse<-vcovHC(lmlog)
