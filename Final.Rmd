@@ -2,7 +2,7 @@
 title: "271 Final"
 author: "Glenn (Ted) Dunmire, Marlea Gwinn, Julian Phillips"
 date: "December 7, 2015"
-output: html_document
+output: pdf_document
 ---
 
 ##Question 1
@@ -17,7 +17,7 @@ _The philanthropist group hires a think tank to examine the relationship between
 #Set Directory
 
 #Ted
-#setwd("~/Documents/271 Final")
+setwd("~/Documents/271 Final")
 
 #Marlea
 #setwd("C://Users/gwina003/Downloads/Final")
@@ -555,7 +555,7 @@ Specifically, the group wanted to know how environmental features affect the val
 
 Because we are using a log scale for home Value, we have to interpret this as follows:
 
-The neighborhood being within 5 miles of water had increases the value of the home 8.3% versus not being in that proximity (note, this was not significant after using robust SEs).
+The neighborhood being within 5 miles of water had increases the value of the home 8.3% versus not being in that proximity.
 
 For every one unit increase in the pollutionIndex as it is calculated, the value of the home descreases by 0.5%.
 
@@ -624,7 +624,7 @@ lines(c(rep(NA, 792), lower), col = "blue")
 lines(c(rep(NA, 792), upper), col = "blue")
 ```
 
-The two blue lines represent the boundary of the predicted volatility. These seem to be in line with the long run average of the series. 
+The two blue lines represent the 95% confidence interval of the predicted volatility. These seem to be in line with the long run average of the series. 
 
 ##Question 3
 
@@ -720,6 +720,7 @@ t(confint(model))
 ```{r}
 #Diagnostic plots of residuals
 resids <- model$residuals
+par(mfrow = c(2,2))
 plot.ts(resids, main = "Residuals of ARIMA Model")
 hist(resids, main = "Histogram of Residuals")
 acf(resids, main = "ACF of Residuals")
@@ -795,6 +796,7 @@ From the time series plot it should be obvious that there is seasonality in this
 series <- read.csv("series04.csv")
 series <- ts(series$X25182, frequency = 12)
 
+par(mfrow = c(2,2))
 plot.ts(diff(log(series)), main = "Time Series of Log First Difference")
 hist(diff(log(series)), main = "Histogram of Log First Difference")
 acf(diff(log(series)), main = "ACF of Log First Difference")
@@ -805,7 +807,7 @@ We are reimporting the series and setting the frequency to 12. We suspect the se
 
 The time series plot of the differenced series resembles white noise. However, the ACF shows regular significance suggesting seasonal terms will be needed there. The PACF also shows seasonality although somewhat less as it decreases eventually. Both plots also show significance at the first lag suggesting non-seasonal terms will also be needed. 
 
-```{r}
+```{r, warning= FALSE}
 #Function to find the best ARIMA model. Credit to Cowpertwait and Metcalfe.
 get.best.arima.seas <- function(x.ts, maxord = c(1,1,1,1,1,1)) {
   best.aic <- 1e8
