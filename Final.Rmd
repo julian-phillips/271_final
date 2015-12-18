@@ -618,7 +618,8 @@ We have printed the forecast above. The 0 predicted value should make sense, thi
 
 ```{r}
 par(mfrow = c(1,1))
-plot.ts(c(series, preds$meanForecast), main = "Forecast Plot")
+plot.ts(c(series, preds$meanForecast), xlab = "Time Period", ylab = "Value", main = "Forecast Plot")
+lines(c(rep(NA, 792), preds$meanForecast), col = "blue")
 lines(c(rep(NA, 792), lower), col = "blue")
 lines(c(rep(NA, 792), upper), col = "blue")
 ```
@@ -741,7 +742,7 @@ As we had suspected, the squared residuals show statistically significant terms 
 garch.fit <- garchFit(~garch(1,1), data = resids, include.mean = FALSE, trace = FALSE)
 garch.fit
 
-par(mforw = c(2,1))
+par(mfrow = c(2,1))
 acf(residuals(garch.fit, standardize = TRUE),  main = "ACF of GARCH Residuals")
 acf(residuals(garch.fit, standardize = TRUE)^2, main = "ACF of GARCH Residuals Squared")
 Box.test(residuals(garch.fit, standardize = TRUE), type = "Ljung-Box")
@@ -759,13 +760,16 @@ std <- predict(garch.fit, n.ahead = 24)
 lower <- c(preds$mean - 1.96 * std$meanError)
 upper <- c(preds$mean + 1.96 * std$meanError)
 #display
-cbind(lower, preds$mean, upper)
+cbind(exp(lower), exp(preds$mean), exp(upper))
 
 par(mfrow = c(1,1))
-plot.ts(c(diff(log(series), d = 2), preds$mean), xlab = "Time Period", ylab = "Value", main = "Time Series Plot with Forecast")
+plot.ts(c(series, exp(preds$mean)), xlab = "Time Period", ylab = "Value", main = "Time Series Plot with Forecast")
+lines(c(rep(NA, 2246), exp(preds$mean)), col = "blue")
+lines(c(rep(NA, 2246), exp(upper)), col = "red")
+lines(c(rep(NA, 2246), exp(lower)), col = "red")
 ```
 
-#Still can't work out
+Above we have displayed and plotted a 24 step forecast. The bounds in red represent the a 95% confidence interval, while the blue line is the mean forecast. The general trend upwards seems to continue, which logically makes sense. 
 
 ##Question 4
 
@@ -878,19 +882,19 @@ We will note here that the residuals do not perfectly resemble white noise. Ther
 ```{r}
 preds <- forecast(mod, h = 24)
 
-lower <- preds$mean - preds$lower[,2]
-upper <- preds$mean + preds$upper[,2]
+cbind(exp(preds$lower[,2]), exp(preds$mean), exp(preds$upper[,2]))
 
-cbind(lower, preds$mean, upper)
-
-plot(forecast(mod, h = 24))
+plot.ts(c(series, exp(preds$mean)), ylim = c(20000, 190000), xlab = "Time", ylab = "Exponentiated (Real) Value", main = "Forecast of Original Series")
+lines(c(rep(NA, 285), exp(preds$mean)), col = "blue")
+lines(c(rep(NA, 285), exp(preds$lower[,2])), col = "red")
+lines(c(rep(NA, 285), exp(preds$upper[,2])), col = "red")
 ```
 
-The plot shows a clearly a wide spectrum. We could transform the series back by taking the exponent but we believe the overall structure is clearly captured in this model. There is quite a wide spectrum. 
+Again the blue value is the mean prediction while the red represent 95% confidence intervals. Notice the upper limit really takes off, which is probably in part due to the general rising trend. The mean predictions actually look very logically like what might be expected from this series. 
+
 
 #NOTES SECTION AND APPENDIX: 
 
-#Check on Box test, is that what it says?
 #probably can be ultimately deleted.
 
 ------------------
