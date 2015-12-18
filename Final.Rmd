@@ -849,8 +849,12 @@ preds <- forecast(mod, h = 24)
 lower <- preds$mean - preds$lower[,2]
 upper <- preds$mean + preds$upper[,2]
 
-cbind(lower, exp(preds$mean), upper)
+cbind(lower, preds$mean, upper)
+
+plot(forecast(mod, h = 24))
 ```
+
+The plot shows a clearly a wide spectrum. We could transform the series back by taking the exponent but we believe the overall structure is clearly captured in this model. There is quite a wide spectrum. 
 
 #NOTES SECTION AND APPENDIX: 
 
